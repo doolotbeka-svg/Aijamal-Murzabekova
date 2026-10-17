@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Language } from '../types';
 import { useContent } from '../ContentContext';
-import { BookOpen, Menu, X, PhoneCall } from 'lucide-react';
+import { BookOpen, Menu, X } from 'lucide-react';
 
 interface NavbarProps {
   lang: Language;
@@ -102,14 +102,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             </div>
 
-            {/* Quick Contact CTA */}
-            <a
-              href="#contact"
-              className="flex items-center gap-1.5 px-3.5 py-1.5 whitespace-nowrap text-xs font-semibold text-white bg-emerald-700 hover:bg-emerald-800 rounded-lg shadow-sm transition-colors"
-            >
-              <PhoneCall className="w-3.5 h-3.5" />
-              <span>{lang === 'ru' ? 'Запись' : 'Жазылуу'}</span>
-            </a>
           </div>
 
           {/* Mobile Menu Button */}
@@ -148,16 +140,6 @@ export const Navbar: React.FC<NavbarProps> = ({
             ))}
           </div>
 
-          <div className="pt-3 border-t border-stone-200 flex flex-col gap-2">
-            <a
-              href="#contact"
-              onClick={() => setMobileMenuOpen(false)}
-              className="w-full flex items-center justify-center gap-2 py-2.5 px-3 text-sm font-semibold text-white bg-emerald-700 rounded-lg shadow-sm"
-            >
-              <PhoneCall className="w-4 h-4" />
-              <span>{lang === 'ru' ? 'Записаться на консультацию' : 'Консультацияга жазылуу'}</span>
-            </a>
-          </div>
         </div>
       )}
     </header>

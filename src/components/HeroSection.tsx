@@ -85,7 +85,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                 className="inline-flex items-center justify-center gap-2 px-6 py-3.5 text-sm sm:text-base font-semibold text-white bg-emerald-800 hover:bg-emerald-900 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 group"
               >
                 <HeartHandshake className="w-5 h-5 text-amber-300 group-hover:scale-110 transition-transform" />
-                <span>{lang === 'ru' ? 'Связаться со мной / Запись' : 'Мага байланышуу / Жазылуу'}</span>
+                <span>{lang === 'ru' ? 'Связаться со мной' : 'Мага байланышуу'}</span>
               </a>
 
               <a
