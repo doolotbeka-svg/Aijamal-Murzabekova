@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Language } from '../types';
 import { teacherProfile } from '../data/content';
 import {
@@ -24,6 +24,9 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   onOpenBooking,
   onOpenAchievements,
 }) => {
+  // Until a real photo is added to public/, show the teacher's initials instead
+  const [photoFailed, setPhotoFailed] = useState(false);
+
   return (
     <section className="relative pt-28 pb-16 md:pt-36 md:pb-24 overflow-hidden bg-gradient-to-b from-amber-50/70 via-stone-50 to-emerald-50/30">
       {/* Decorative background glow */}
@@ -139,12 +142,22 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
               <div className="relative bg-white p-3 rounded-2xl shadow-xl border border-stone-200/80">
                 {/* Photo container */}
                 <div className="relative aspect-[4/5] rounded-xl overflow-hidden bg-stone-100">
-                  <img
-                    src="https://images.unsplash.com/photo-1544717305-2782549b5136?auto=format&fit=crop&w=900&q=80"
-                    alt="Учительница начальных классов Айгүл Бектемировна"
-                    className="w-full h-full object-cover object-center"
-                    loading="eager"
-                  />
+                  {photoFailed ? (
+                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-emerald-700 via-teal-800 to-amber-700 text-amber-50 font-serif text-7xl font-bold">
+                      {teacherProfile.fullName[lang]
+                        .split(' ')
+                        .map((part) => part.charAt(0))
+                        .join('')}
+                    </div>
+                  ) : (
+                    <img
+                      src={teacherProfile.photoUrl}
+                      alt={teacherProfile.fullName[lang]}
+                      className="w-full h-full object-cover object-center"
+                      loading="eager"
+                      onError={() => setPhotoFailed(true)}
+                    />
+                  )}
                   <div className="absolute inset-0 bg-gradient-to-t from-stone-950/70 via-transparent to-transparent" />
 
                   {/* Badges on photo */}

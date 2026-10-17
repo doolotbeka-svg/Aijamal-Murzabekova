@@ -83,7 +83,9 @@ export const Footer: React.FC<FooterProps> = ({ lang }) => {
             </div>
             <div className="flex items-center gap-2 text-xs text-stone-400">
               <Phone className="w-4 h-4 text-emerald-400 shrink-0" />
-              <span>{schoolContactDetails.phoneDisplay}</span>
+              <a href={`tel:${schoolContactDetails.phone.replace(/[^+\d]/g, '')}`} className="hover:text-emerald-400 transition-colors">
+                {schoolContactDetails.phoneDisplay}
+              </a>
             </div>
           </div>
 
@@ -104,7 +106,7 @@ export const Footer: React.FC<FooterProps> = ({ lang }) => {
 
         {/* Bottom bar */}
         <div className="pt-8 border-t border-stone-800 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-stone-500">
-          <p>© {new Date().getFullYear()} Абдуллаева Айгүл Бектемировна. {lang === 'ru' ? 'Все права защищены.' : 'Бардык укуктар корголгон.'}</p>
+          <p>© {new Date().getFullYear()} {teacherProfile.fullName[lang]}. {lang === 'ru' ? 'Все права защищены.' : 'Бардык укуктар корголгон.'}</p>
           <div className="flex items-center gap-1 text-stone-400">
             <span>{lang === 'ru' ? 'С любовью к детям древнего города Ош' : 'Байыркы Ош шаарынын балдарына болгон сүйүү менен'}</span>
             <Heart className="w-3.5 h-3.5 text-rose-500 fill-rose-500 inline" />

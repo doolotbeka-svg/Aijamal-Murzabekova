@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Language, UserProfile, MethodMaterial, ApplicationRecord } from './types';
+import { Language, MethodMaterial } from './types';
 import { Navbar } from './components/Navbar';
 import { HeroSection } from './components/HeroSection';
 import { AboutSection } from './components/AboutSection';
@@ -9,106 +9,73 @@ import { GallerySection } from './components/GallerySection';
 import { ReviewsSection } from './components/ReviewsSection';
 import { ContactSection } from './components/ContactSection';
 import { Footer } from './components/Footer';
-import { AuthModal } from './components/AuthModal';
 import { AdminDashboardModal } from './components/AdminDashboardModal';
 import { AiChatbot } from './components/AiChatbot';
 
+const ADMIN_HASH = '#admin';
+const LANG_KEY = 'teacher_portfolio_lang';
+
+function track(body: Record<string, string>) {
+  fetch('/api/telemetry', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  }).catch(() => {});
+}
+
 export default function App() {
-  const [lang, setLang] = useState<Language>('ru');
-  const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
+  const [lang, setLang] = useState<Language>(() => {
     try {
-      const saved = localStorage.getItem('teacher_portfolio_user');
-      return saved ? JSON.parse(saved) : null;
+      return localStorage.getItem(LANG_KEY) === 'kg' ? 'kg' : 'ru';
     } catch {
-      return null;
+      return 'ru';
     }
   });
 
-  const [authModalOpen, setAuthModalOpen] = useState(false);
-  const [dashboardModalOpen, setDashboardModalOpen] = useState(false);
+  // The admin panel is hidden: it is only reachable by opening site#admin
+  const [adminOpen, setAdminOpen] = useState(() => window.location.hash === ADMIN_HASH);
   const [chatBotOpen, setChatBotOpen] = useState(false);
 
-  // Track initial page visit on mount
   useEffect(() => {
-    fetch('/api/telemetry', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type: 'visit',
-        title: 'Посещение портфолио',
-        details: 'Просмотр главной страницы портфолио',
-        location: 'г. Ош (Посетитель)',
-      }),
-    }).catch(() => {});
+    const onHashChange = () => setAdminOpen(window.location.hash === ADMIN_HASH);
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.lang = lang === 'kg' ? 'ky' : 'ru';
+  }, [lang]);
+
+  // Count one visit per browser session (not on every reload)
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem('visit_tracked')) return;
+      sessionStorage.setItem('visit_tracked', '1');
+    } catch {}
+    track({ type: 'visit' });
   }, []);
 
   const handleLanguageChange = (newLang: Language) => {
     setLang(newLang);
-    fetch('/api/telemetry', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type: 'visit',
-        title: 'Переключение языка',
-        details: `Пользователь переключил интерфейс на ${newLang === 'ru' ? 'Русский' : 'Кыргызча'}`,
-        location: 'г. Ош',
-      }),
-    }).catch(() => {});
+    try {
+      localStorage.setItem(LANG_KEY, newLang);
+    } catch {}
   };
 
-  const handleLoginSuccess = (user: UserProfile) => {
-    setCurrentUser(user);
-    try {
-      localStorage.setItem('teacher_portfolio_user', JSON.stringify(user));
-    } catch {}
-    fetch('/api/telemetry', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type: 'visit',
-        title: 'Авторизация пользователя',
-        details: `${user.name} (${user.role}) вошел через ${user.provider}`,
-        location: 'г. Ош',
-      }),
-    }).catch(() => {});
-  };
-
-  const handleLogout = () => {
-    setCurrentUser(null);
-    try {
-      localStorage.removeItem('teacher_portfolio_user');
-    } catch {}
+  const closeAdmin = () => {
+    setAdminOpen(false);
+    // Drop "#admin" from the address bar without adding a history entry
+    history.replaceState(null, '', window.location.pathname + window.location.search);
   };
 
   const handleTrackDownload = (material: MethodMaterial) => {
-    fetch('/api/telemetry', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        type: 'download',
-        title: 'Скачивание материала',
-        details: `${material.title[lang]} (${material.fileType})`,
-        location: 'г. Ош (Педагог / Родитель)',
-      }),
-    }).catch(() => {});
-  };
-
-  const handleApplicationCreated = (app: ApplicationRecord) => {
-    // Application is already submitted and recorded via /api/applications
+    track({ type: 'download', details: `${material.title.ru} (${material.grade})` });
   };
 
   return (
     <div className="min-h-screen bg-stone-50 text-stone-900 font-sans selection:bg-emerald-200 selection:text-emerald-900">
       {/* Sticky Navigation */}
-      <Navbar
-        lang={lang}
-        onLanguageChange={handleLanguageChange}
-        onOpenAuth={() => setAuthModalOpen(true)}
-        onOpenDashboard={() => setDashboardModalOpen(true)}
-        onOpenChat={() => setChatBotOpen(true)}
-        currentUser={currentUser}
-        onLogout={handleLogout}
-      />
+      <Navbar lang={lang} onLanguageChange={handleLanguageChange} onOpenChat={() => setChatBotOpen(true)} />
 
       <main>
         {/* Hero Section with Credo and Badges */}
@@ -128,10 +95,7 @@ export default function App() {
         <AboutSection lang={lang} />
 
         {/* Methodological Bank & Interactive Lessons */}
-        <MethodologySection
-          lang={lang}
-          onTrackDownload={handleTrackDownload}
-        />
+        <MethodologySection lang={lang} onTrackDownload={handleTrackDownload} />
 
         {/* Achievements and Student Awards */}
         <AchievementsSection lang={lang} />
@@ -139,42 +103,23 @@ export default function App() {
         {/* Gallery of School Life (Alippe, Nooruz, Lessons, Osh landmarks) */}
         <GallerySection lang={lang} />
 
-        {/* Testimonials from Parents & Colleagues */}
+        {/* Moderated testimonials from parents & colleagues */}
         <ReviewsSection lang={lang} />
 
-        {/* Contacts, School Location in Osh, Booking Form with Messenger Notifications */}
-        <ContactSection
-          lang={lang}
-          onApplicationCreated={handleApplicationCreated}
-        />
+        {/* Contacts, School Location in Osh, Booking Form */}
+        <ContactSection lang={lang} />
       </main>
 
       {/* Footer */}
       <Footer lang={lang} />
 
-      {/* Social Login Modal */}
-      {authModalOpen && (
-        <AuthModal
-          lang={lang}
-          onClose={() => setAuthModalOpen(false)}
-          onLoginSuccess={handleLoginSuccess}
-        />
-      )}
-
-      {/* Real-time Admin Monitoring Dashboard */}
-      {dashboardModalOpen && (
-        <AdminDashboardModal
-          lang={lang}
-          onClose={() => setDashboardModalOpen(false)}
-        />
-      )}
+      {/* Hidden admin panel (site#admin), password protected on the server */}
+      {adminOpen && <AdminDashboardModal lang={lang} onClose={closeAdmin} />}
 
       {/* Pedagogical AI Chatbot */}
-      <AiChatbot
-        lang={lang}
-        isOpen={chatBotOpen}
-        onToggle={() => setChatBotOpen(!chatBotOpen)}
-      />
+      {!adminOpen && (
+        <AiChatbot lang={lang} isOpen={chatBotOpen} onToggle={() => setChatBotOpen(!chatBotOpen)} />
+      )}
     </div>
   );
 }

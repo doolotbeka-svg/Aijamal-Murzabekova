@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Language } from '../types';
+import { schoolContactDetails, teacherProfile } from '../data/content';
 import {
   MessageCircle,
   X,
@@ -26,17 +27,17 @@ interface Message {
 }
 
 export const AiChatbot: React.FC<AiChatbotProps> = ({ lang, isOpen, onToggle }) => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: 'init-1',
-      sender: 'assistant',
-      text:
-        lang === 'ru'
-          ? 'Здравствуйте! Я интерактивный ИИ-помощник учительницы высшей категории Абдуллаевой Айгүл Бектемировны (г. Ош). С удовольствием отвечу на ваши вопросы о подготовке к 1 классу, расписании уроков, наших методиках или помогу записаться на консультацию. Чем могу помочь?'
-          : 'Саламатсызбы! Мен башталгыч класс мугалими Абдуллаева Айгүл Бектемировнанын виртуалдык жардамчысымын. 1-класска кабыл алуу, баланы мектепке даярдоо же ачык сабактар боюнча бардык суроолоруңузга жооп берүүгө даярмын!',
-      timestamp: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
-    },
-  ]);
+  // The greeting is rendered from the current language, so it follows the RU/KG switch
+  const greeting: Message = {
+    id: 'init-1',
+    sender: 'assistant',
+    text:
+      lang === 'ru'
+        ? `Здравствуйте! Я ИИ-помощник учителя начальных классов ${teacherProfile.fullName.ru} (г. Ош). Отвечу на вопросы о подготовке к 1 классу, методиках обучения или помогу записаться на консультацию. Чем могу помочь?`
+        : `Саламатсызбы! Мен башталгыч класс мугалими ${teacherProfile.fullName.kg} эженин виртуалдык жардамчысымын. 1-класска кабыл алуу, баланы мектепке даярдоо же ачык сабактар боюнча суроолоруңузга жооп берүүгө даярмын!`,
+    timestamp: '',
+  };
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -82,18 +83,23 @@ export const AiChatbot: React.FC<AiChatbotProps> = ({ lang, isOpen, onToggle }) 
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userText, lang }),
+        body: JSON.stringify({
+          message: userText,
+          lang,
+          history: messages.map(({ sender, text }) => ({ sender, text })),
+        }),
       });
 
       const data = await response.json();
+      if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
       const assistantMsg: Message = {
         id: `msg-resp-${Date.now()}`,
         sender: 'assistant',
         text:
           data.reply ||
           (lang === 'ru'
-            ? 'Спасибо за ваш вопрос! Айгүл Бектемировна с радостью обсудит это на личной встрече или открытом уроке.'
-            : 'Сурооңузга чоң рахмат! Айгүл Бектемировна бул тууралуу жеке баарлашууда кеңири айтып берет.'),
+            ? `Спасибо за ваш вопрос! ${teacherProfile.shortName.ru} с радостью обсудит это на личной встрече.`
+            : `Сурооңузга чоң рахмат! ${teacherProfile.shortName.kg} бул тууралуу жеке баарлашууда кеңири айтып берет.`),
         timestamp: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
       };
 
@@ -107,8 +113,8 @@ export const AiChatbot: React.FC<AiChatbotProps> = ({ lang, isOpen, onToggle }) 
           sender: 'assistant',
           text:
             lang === 'ru'
-              ? 'Произошла небольшая задержка. Вы всегда можете связаться с Айгүл Бектемировной через WhatsApp: +996 555 12-34-56.'
-              : 'Интернет байланышында ката кетти. Айгүл Бектемировна менен WhatsApp аркылуу түздөн-түз байланышсаңыз болот: +996 555 12-34-56.',
+              ? `Не удалось получить ответ. Вы всегда можете связаться с учителем через WhatsApp: ${schoolContactDetails.phoneDisplay}.`
+              : `Жооп алынган жок. Мугалим менен WhatsApp аркылуу түздөн-түз байланышсаңыз болот: ${schoolContactDetails.phoneDisplay}.`,
           timestamp: new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }),
         },
       ]);
@@ -138,7 +144,7 @@ export const AiChatbot: React.FC<AiChatbotProps> = ({ lang, isOpen, onToggle }) 
 
       {/* Floating Chat Modal */}
       {isOpen && (
-        <div className="fixed bottom-4 right-4 z-50 w-full max-w-sm sm:max-w-md bg-white rounded-2xl shadow-2xl border border-stone-200 overflow-hidden flex flex-col h-[520px] max-h-[85vh]">
+        <div className="fixed bottom-4 right-4 left-4 sm:left-auto z-50 sm:w-full max-w-sm sm:max-w-md bg-white rounded-2xl shadow-2xl border border-stone-200 overflow-hidden flex flex-col h-[520px] max-h-[85vh]">
           {/* Top Chat Header */}
           <div className="bg-gradient-to-r from-emerald-900 via-teal-900 to-emerald-950 text-white p-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -148,7 +154,7 @@ export const AiChatbot: React.FC<AiChatbotProps> = ({ lang, isOpen, onToggle }) 
               <div className="text-left">
                 <div className="flex items-center gap-2">
                   <h4 className="font-serif font-bold text-sm">
-                    {lang === 'ru' ? 'Ассистент Айгүл эже (AI)' : 'Айгүл эже жардамчысы (AI)'}
+                    {lang === 'ru' ? 'Ассистент Айжамал эже (AI)' : 'Айжамал эже жардамчысы (AI)'}
                   </h4>
                   <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                 </div>
@@ -162,6 +168,7 @@ export const AiChatbot: React.FC<AiChatbotProps> = ({ lang, isOpen, onToggle }) 
 
             <button
               onClick={onToggle}
+              aria-label={lang === 'ru' ? 'Закрыть чат' : 'Чатты жабуу'}
               className="p-1.5 rounded-lg text-stone-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
@@ -170,7 +177,7 @@ export const AiChatbot: React.FC<AiChatbotProps> = ({ lang, isOpen, onToggle }) 
 
           {/* Messages Container */}
           <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-stone-50/60 text-left text-xs sm:text-sm">
-            {messages.map((m) => {
+            {[greeting, ...messages].map((m) => {
               const isAssistant = m.sender === 'assistant';
               return (
                 <div
@@ -193,13 +200,15 @@ export const AiChatbot: React.FC<AiChatbotProps> = ({ lang, isOpen, onToggle }) 
                     }`}
                   >
                     <p className="whitespace-pre-line">{m.text}</p>
-                    <span
-                      className={`block text-[10px] mt-1 text-right ${
-                        isAssistant ? 'text-stone-400' : 'text-emerald-200'
-                      }`}
-                    >
-                      {m.timestamp}
-                    </span>
+                    {m.timestamp && (
+                      <span
+                        className={`block text-[10px] mt-1 text-right ${
+                          isAssistant ? 'text-stone-400' : 'text-emerald-200'
+                        }`}
+                      >
+                        {m.timestamp}
+                      </span>
+                    )}
                   </div>
 
                   {!isAssistant && (
@@ -251,6 +260,7 @@ export const AiChatbot: React.FC<AiChatbotProps> = ({ lang, isOpen, onToggle }) 
             <input
               type="text"
               value={input}
+              maxLength={1000}
               onChange={(e) => setInput(e.target.value)}
               placeholder={
                 lang === 'ru'
@@ -261,6 +271,7 @@ export const AiChatbot: React.FC<AiChatbotProps> = ({ lang, isOpen, onToggle }) 
             />
             <button
               type="submit"
+              aria-label={lang === 'ru' ? 'Отправить' : 'Жөнөтүү'}
               disabled={isLoading || !input.trim()}
               className="p-2.5 bg-emerald-800 hover:bg-emerald-900 disabled:opacity-40 text-white rounded-xl transition-colors cursor-pointer"
             >

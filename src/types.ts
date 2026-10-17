@@ -40,15 +40,19 @@ export interface GalleryItem {
   description: { ru: string; kg: string };
 }
 
+export type ReviewStatus = 'pending' | 'approved' | 'rejected';
+
 export interface Review {
   id: string;
   author: string;
-  role: { ru: string; kg: string };
+  role: string;
   rating: number;
-  text: { ru: string; kg: string };
-  date: string;
-  avatarBg: string;
+  text: string;
+  createdAt: string;
+  status: ReviewStatus;
 }
+
+export type ApplicationStatus = 'new' | 'contacted' | 'consulted' | 'enrolled' | 'archived';
 
 export interface ApplicationRecord {
   id: string;
@@ -59,19 +63,31 @@ export interface ApplicationRecord {
   preferredMessenger: 'WhatsApp' | 'Telegram' | 'Phone';
   comment: string;
   createdAt: string;
-  status: 'new' | 'contacted' | 'consulted' | 'enrolled';
-  channelNotificationSent: {
-    telegram: boolean;
-    whatsapp: boolean;
-    timestamp: string;
+  status: ApplicationStatus;
+  adminNote: string;
+  notification: {
+    telegram: 'sent' | 'failed' | 'disabled';
+    at: string;
   };
 }
 
-export interface UserProfile {
+export interface ActivityEvent {
   id: string;
-  name: string;
-  emailOrPhone: string;
-  provider: 'google' | 'telegram' | 'whatsapp' | 'phone';
-  role: 'parent' | 'colleague' | 'commission' | 'guest';
-  avatar?: string;
+  type: 'download' | 'application' | 'review' | 'chat_query';
+  title: string;
+  details: string;
+  createdAt: string;
+}
+
+export interface AdminStats {
+  totalVisits: number;
+  visitsToday: number;
+  totalDownloads: number;
+  totalChatQueries: number;
+  totalApplications: number;
+  newApplications: number;
+  pendingReviews: number;
+  last7Days: { date: string; visits: number }[];
+  recentActivities: ActivityEvent[];
+  integrations: { telegram: boolean; gemini: boolean; geminiModel: string };
 }

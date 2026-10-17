@@ -1,6 +1,41 @@
 import React, { useState } from 'react';
 import { Language, MethodMaterial } from '../types';
-import { methodologicalMaterials } from '../data/content';
+import { methodologicalMaterials, teacherProfile } from '../data/content';
+
+function escapeHtml(text: string) {
+  return text.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+}
+
+/** Builds a Word-compatible (.doc) lesson plan from the material and starts the download. */
+function downloadLessonPlan(material: MethodMaterial, lang: Language) {
+  const L = (v: { ru: string; kg: string }) => escapeHtml(v[lang]);
+  const labels =
+    lang === 'ru'
+      ? { grade: 'Класс', subject: 'Предмет', duration: 'Длительность', goals: 'Цели урока', equipment: 'Оборудование', stages: 'Ход урока', author: 'Автор' }
+      : { grade: 'Класс', subject: 'Сабак', duration: 'Узактыгы', goals: 'Сабактын максаты', equipment: 'Жабдуулар', stages: 'Сабактын жүрүшү', author: 'Автору' };
+  const stages = material.contentPreview.stages
+    .map((st) => `<li><b>${L(st.title)}</b><br/>${L(st.text)}</li>`)
+    .join('');
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${L(material.title)}</title>
+<style>body{font-family:'Times New Roman',serif;font-size:13pt;line-height:1.5;max-width:720px;margin:24px auto}h1{font-size:18pt}h2{font-size:14pt;margin-top:18px}li{margin-bottom:8px}.meta{color:#444}</style></head><body>
+<h1>${L(material.title)}</h1>
+<p class="meta">${labels.grade}: ${escapeHtml(material.grade)} &nbsp;•&nbsp; ${labels.subject}: ${L(material.subject)} &nbsp;•&nbsp; ${labels.duration}: ${escapeHtml(material.duration)}</p>
+<p>${L(material.description)}</p>
+<h2>${labels.goals}</h2><p>${L(material.contentPreview.goals)}</p>
+<h2>${labels.equipment}</h2><p>${L(material.contentPreview.equipment)}</p>
+<h2>${labels.stages}</h2><ol>${stages}</ol>
+<p class="meta">${labels.author}: ${escapeHtml(teacherProfile.fullName[lang])}, ${escapeHtml(teacherProfile.school[lang])}</p>
+</body></html>`;
+  const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${material.title[lang].replace(/[\\/:*?"<>|«»]/g, '').slice(0, 80)}.doc`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 import {
   FileText,
   Download,
@@ -41,6 +76,7 @@ export const MethodologySection: React.FC<MethodologySectionProps> = ({
       : methodologicalMaterials.filter((m) => m.category === activeCategory);
 
   const handleDownload = (material: MethodMaterial) => {
+    downloadLessonPlan(material, lang);
     onTrackDownload(material);
     setDownloadSuccessModal(material.title[lang]);
     setTimeout(() => {
@@ -85,7 +121,7 @@ export const MethodologySection: React.FC<MethodologySectionProps> = ({
 
         {/* Notification Toast for simulated download */}
         {downloadSuccessModal && (
-          <div className="fixed bottom-6 right-6 z-50 max-w-md bg-stone-900 text-white p-4 rounded-xl shadow-xl flex items-start gap-3 border border-emerald-500/50 animate-bounce">
+          <div className="fixed bottom-6 right-6 left-6 sm:left-auto z-50 max-w-md bg-stone-900 text-white p-4 rounded-xl shadow-xl flex items-start gap-3 border border-emerald-500/50">
             <CheckCircle className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
             <div className="text-xs">
               <p className="font-bold text-sm text-emerald-300">
@@ -94,8 +130,8 @@ export const MethodologySection: React.FC<MethodologySectionProps> = ({
               <p className="text-stone-300 mt-0.5">{downloadSuccessModal}</p>
               <p className="text-stone-400 text-[10px] mt-1">
                 {lang === 'ru'
-                  ? 'Событие зафиксировано в панели активности'
-                  : 'Окуя көзөмөл панелине жазылды'}
+                  ? 'Файл .doc откроется в Word, LibreOffice или Google Документах'
+                  : '.doc файлы Word, LibreOffice же Google Документтеринде ачылат'}
               </p>
             </div>
             <button
@@ -126,9 +162,9 @@ export const MethodologySection: React.FC<MethodologySectionProps> = ({
                   </span>
                   <div className="flex items-center gap-1.5 text-xs text-stone-500 font-medium">
                     <span className="px-1.5 py-0.5 bg-stone-100 rounded text-[10px] font-bold text-stone-700">
-                      {mat.fileType}
+                      DOC
                     </span>
-                    <span>{mat.fileSize}</span>
+                    <span>{mat.duration}</span>
                   </div>
                 </div>
 
@@ -241,8 +277,8 @@ export const MethodologySection: React.FC<MethodologySectionProps> = ({
               <div className="bg-stone-50 px-6 py-4 border-t border-stone-200 flex flex-wrap items-center justify-between gap-3">
                 <div className="text-xs text-stone-500">
                   {lang === 'ru'
-                    ? `Формат: ${selectedMaterial.fileType} (${selectedMaterial.fileSize})`
-                    : `Форматы: ${selectedMaterial.fileType} (${selectedMaterial.fileSize})`}
+                    ? 'Формат: DOC (Word)'
+                    : 'Форматы: DOC (Word)'}
                 </div>
                 <div className="flex items-center gap-2">
                   <button

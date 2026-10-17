@@ -1,50 +1,73 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Language, Review } from '../types';
-import { reviewsList } from '../data/content';
-import { Star, MessageSquarePlus, CheckCircle2, User, X, Sparkles } from 'lucide-react';
+import { Star, MessageSquarePlus, CheckCircle2, X, AlertCircle } from 'lucide-react';
+
+const AVATAR_COLORS = ['bg-emerald-600', 'bg-amber-600', 'bg-sky-600', 'bg-indigo-600', 'bg-rose-600', 'bg-teal-600'];
+
+function avatarColor(name: string) {
+  let hash = 0;
+  for (const ch of name) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return AVATAR_COLORS[hash % AVATAR_COLORS.length];
+}
 
 interface ReviewsSectionProps {
   lang: Language;
 }
 
 export const ReviewsSection: React.FC<ReviewsSectionProps> = ({ lang }) => {
-  const [reviews, setReviews] = useState<Review[]>(reviewsList);
+  const [reviews, setReviews] = useState<Review[]>([]);
   const [showAddReviewModal, setShowAddReviewModal] = useState(false);
   const [newAuthor, setNewAuthor] = useState('');
   const [newRole, setNewRole] = useState('');
   const [newText, setNewText] = useState('');
   const [newRating, setNewRating] = useState(5);
   const [submittedMessage, setSubmittedMessage] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSubmitReview = (e: React.FormEvent) => {
+  useEffect(() => {
+    fetch('/api/reviews')
+      .then((res) => (res.ok ? res.json() : { reviews: [] }))
+      .then((data) => setReviews(data.reviews || []))
+      .catch(() => {});
+  }, []);
+
+  const closeModal = () => {
+    setShowAddReviewModal(false);
+    setSubmittedMessage(false);
+    setError('');
+  };
+
+  const handleSubmitReview = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newAuthor.trim() || !newText.trim()) return;
-
-    const createdReview: Review = {
-      id: `rev-${Date.now()}`,
-      author: newAuthor.trim(),
-      role: {
-        ru: newRole.trim() || 'Родитель ученика, г. Ош',
-        kg: newRole.trim() || 'Окуучунун ата-энеси, Ош ш.',
-      },
-      rating: newRating,
-      text: {
-        ru: newText.trim(),
-        kg: newText.trim(),
-      },
-      date: 'Сегодня',
-      avatarBg: 'bg-emerald-700',
-    };
-
-    setReviews([createdReview, ...reviews]);
-    setSubmittedMessage(true);
-    setTimeout(() => {
-      setSubmittedMessage(false);
-      setShowAddReviewModal(false);
+    if (newAuthor.trim().length < 2 || newText.trim().length < 10) {
+      setError(
+        lang === 'ru'
+          ? 'Укажите имя и напишите отзыв хотя бы в одно предложение.'
+          : 'Атыңызды жана жок дегенде бир сүйлөм пикир жазыңыз.'
+      );
+      return;
+    }
+    setIsSubmitting(true);
+    setError('');
+    try {
+      const res = await fetch('/api/reviews', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ author: newAuthor, role: newRole, text: newText, rating: newRating }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      setSubmittedMessage(true);
       setNewAuthor('');
       setNewRole('');
       setNewText('');
-    }, 2000);
+      setNewRating(5);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -76,6 +99,14 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({ lang }) => {
         </div>
 
         {/* Reviews Grid */}
+        {reviews.length === 0 && (
+          <div className="bg-white p-10 rounded-2xl border border-dashed border-stone-300 text-center text-stone-500 text-sm">
+            {lang === 'ru'
+              ? 'Отзывов пока нет — будьте первым, кто поделится впечатлениями!'
+              : 'Азырынча пикир жок — биринчи болуп оюңузду бөлүшүңүз!'}
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {reviews.map((rev) => (
             <div
@@ -91,7 +122,7 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({ lang }) => {
                 </div>
 
                 <p className="font-serif italic text-stone-800 text-sm sm:text-base leading-relaxed mb-6">
-                  «{rev.text[lang]}»
+                  «{rev.text}»
                 </p>
               </div>
 
@@ -99,7 +130,7 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({ lang }) => {
               <div className="pt-4 border-t border-stone-100 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div
-                    className={`w-10 h-10 rounded-full ${rev.avatarBg} text-white font-bold text-sm flex items-center justify-center shrink-0`}
+                    className={`w-10 h-10 rounded-full ${avatarColor(rev.author)} text-white font-bold text-sm flex items-center justify-center shrink-0`}
                   >
                     {rev.author.charAt(0)}
                   </div>
@@ -107,11 +138,17 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({ lang }) => {
                     <h4 className="font-serif font-bold text-stone-900 text-sm">
                       {rev.author}
                     </h4>
-                    <p className="text-xs text-stone-500">{rev.role[lang]}</p>
+                    {rev.role && <p className="text-xs text-stone-500">{rev.role}</p>}
                   </div>
                 </div>
 
-                <span className="text-[11px] text-stone-400 font-medium">{rev.date}</span>
+                <span className="text-[11px] text-stone-400 font-medium">
+                  {new Date(rev.createdAt).toLocaleDateString(lang === 'ru' ? 'ru-RU' : 'ky-KG', {
+                    day: 'numeric',
+                    month: 'long',
+                    year: 'numeric',
+                  })}
+                </span>
               </div>
             </div>
           ))}
@@ -122,7 +159,8 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({ lang }) => {
           <div className="fixed inset-0 z-50 bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-4">
             <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-stone-200 p-6 sm:p-8 relative text-left">
               <button
-                onClick={() => setShowAddReviewModal(false)}
+                onClick={closeModal}
+                aria-label={lang === 'ru' ? 'Закрыть' : 'Жабуу'}
                 className="absolute top-4 right-4 p-2 text-stone-400 hover:text-stone-800 rounded-full"
               >
                 <X className="w-5 h-5" />
@@ -144,8 +182,16 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({ lang }) => {
                     {lang === 'ru' ? 'Спасибо за тёплые слова!' : 'Жылуу пикириңизге чоң рахмат!'}
                   </p>
                   <p className="text-stone-500 text-xs">
-                    {lang === 'ru' ? 'Ваш отзыв опубликован на сайте.' : 'Сиздин пикириңиз сайтка жарыяланды.'}
+                    {lang === 'ru'
+                      ? 'Отзыв появится на сайте после проверки учителем.'
+                      : 'Пикириңиз мугалим текшергенден кийин сайтта жарыяланат.'}
                   </p>
+                  <button
+                    onClick={closeModal}
+                    className="mt-3 px-5 py-2 text-xs font-semibold text-stone-700 bg-stone-100 hover:bg-stone-200 rounded-xl cursor-pointer"
+                  >
+                    {lang === 'ru' ? 'Закрыть' : 'Жабуу'}
+                  </button>
                 </div>
               ) : (
                 <form onSubmit={handleSubmitReview} className="space-y-4">
@@ -212,6 +258,7 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({ lang }) => {
                       rows={4}
                       required
                       value={newText}
+                      maxLength={1500}
                       onChange={(e) => setNewText(e.target.value)}
                       placeholder={
                         lang === 'ru'
@@ -222,19 +269,29 @@ export const ReviewsSection: React.FC<ReviewsSectionProps> = ({ lang }) => {
                     />
                   </div>
 
+                  {error && (
+                    <p role="alert" className="flex items-start gap-1.5 text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg p-2.5">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      <span>{error}</span>
+                    </p>
+                  )}
+
                   <div className="pt-2 flex justify-end gap-3">
                     <button
                       type="button"
-                      onClick={() => setShowAddReviewModal(false)}
+                      onClick={closeModal}
                       className="px-4 py-2.5 text-xs font-semibold text-stone-600 hover:bg-stone-100 rounded-xl"
                     >
                       {lang === 'ru' ? 'Отмена' : 'Жокко чыгаруу'}
                     </button>
                     <button
                       type="submit"
-                      className="px-5 py-2.5 text-xs font-semibold text-white bg-emerald-800 hover:bg-emerald-900 rounded-xl shadow-xs"
+                      disabled={isSubmitting}
+                      className="px-5 py-2.5 text-xs font-semibold text-white bg-emerald-800 hover:bg-emerald-900 disabled:opacity-50 rounded-xl shadow-xs"
                     >
-                      {lang === 'ru' ? 'Опубликовать отзыв' : 'Жарыялоо'}
+                      {isSubmitting
+                        ? lang === 'ru' ? 'Отправка…' : 'Жөнөтүлүүдө…'
+                        : lang === 'ru' ? 'Отправить отзыв' : 'Жөнөтүү'}
                     </button>
                   </div>
                 </form>

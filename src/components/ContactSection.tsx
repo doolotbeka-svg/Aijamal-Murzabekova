@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Language, ApplicationRecord } from '../types';
-import { schoolContactDetails } from '../data/content';
+import { Language } from '../types';
+import { schoolContactDetails, teacherProfile } from '../data/content';
 import {
   MapPin,
   Phone,
@@ -12,19 +12,15 @@ import {
   Calendar,
   Sparkles,
   ExternalLink,
+  AlertCircle,
   ShieldCheck,
-  BellRing,
 } from 'lucide-react';
 
 interface ContactSectionProps {
   lang: Language;
-  onApplicationCreated: (app: ApplicationRecord) => void;
 }
 
-export const ContactSection: React.FC<ContactSectionProps> = ({
-  lang,
-  onApplicationCreated,
-}) => {
+export const ContactSection: React.FC<ContactSectionProps> = ({ lang }) => {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('+996 ');
   const [purpose, setPurpose] = useState('Запись на консультацию по приёму в 1-й класс');
@@ -32,15 +28,24 @@ export const ContactSection: React.FC<ContactSectionProps> = ({
   const [preferredMessenger, setPreferredMessenger] = useState<'WhatsApp' | 'Telegram' | 'Phone'>('WhatsApp');
   const [comment, setComment] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submissionResult, setSubmissionResult] = useState<{
-    success: boolean;
-    app: ApplicationRecord;
-    alerts: any;
-  } | null>(null);
+  const [submittedName, setSubmittedName] = useState<string | null>(null);
+  const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !phone.trim() || phone.length < 8) return;
+    setError('');
+    if (name.trim().length < 2) {
+      setError(lang === 'ru' ? 'Пожалуйста, укажите ваше имя.' : 'Атыңызды жазыңыз.');
+      return;
+    }
+    if (phone.replace(/\D/g, '').length < 9) {
+      setError(
+        lang === 'ru'
+          ? 'Проверьте номер телефона — например, +996 770 12-34-56.'
+          : 'Телефон номериңизди текшериңиз — мисалы, +996 770 12-34-56.'
+      );
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -57,17 +62,19 @@ export const ContactSection: React.FC<ContactSectionProps> = ({
         }),
       });
 
-      const data = await res.json();
-      if (data.success && data.application) {
-        setSubmissionResult({
-          success: true,
-          app: data.application,
-          alerts: data.notificationAlert,
-        });
-        onApplicationCreated(data.application);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || `HTTP ${res.status}`);
       }
-    } catch (err) {
+      setSubmittedName(name.trim());
+      setComment('');
+    } catch (err: any) {
       console.error('Failed to submit application:', err);
+      setError(
+        lang === 'ru'
+          ? `Не удалось отправить заявку (${err.message}). Попробуйте ещё раз или напишите напрямую в WhatsApp.`
+          : `Билдирме жөнөтүлгөн жок (${err.message}). Кайра аракет кылыңыз же WhatsApp аркылуу жазыңыз.`
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -75,7 +82,7 @@ export const ContactSection: React.FC<ContactSectionProps> = ({
 
   // Pre-fill text for WhatsApp direct redirect
   const whatsappPreFilledText = encodeURIComponent(
-    `Саламатсызбы / Здравствуйте, Айгүл Бектемировна! Мен сайт аркылуу жазылып жатам. Менин атым: ${
+    `Саламатсызбы / Здравствуйте, ${teacherProfile.shortName.ru}! Мен сайт аркылуу жазылып жатам. Менин атым: ${
       name || 'Родитель'
     }. Суроо: ${purpose}. Телефон: ${phone}`
   );
@@ -134,7 +141,7 @@ export const ContactSection: React.FC<ContactSectionProps> = ({
                       {lang === 'ru' ? 'Рабочий телефон / WhatsApp' : 'Жумушчу телефон / WhatsApp'}
                     </p>
                     <a
-                      href={`tel:${schoolContactDetails.phone}`}
+                      href={`tel:${schoolContactDetails.phone.replace(/[^+\d]/g, '')}`}
                       className="text-stone-800 hover:text-emerald-800 font-bold text-sm block mt-0.5"
                     >
                       {schoolContactDetails.phoneDisplay}
@@ -199,15 +206,16 @@ export const ContactSection: React.FC<ContactSectionProps> = ({
               </div>
             </div>
 
-            {/* Instant Messenger Sync Info Box */}
+            {/* How the request reaches the teacher */}
             <div className="bg-gradient-to-br from-emerald-900 to-teal-950 text-white p-5 rounded-2xl shadow-sm text-xs space-y-2">
               <div className="flex items-center gap-2 text-amber-300 font-bold">
-                <BellRing className="w-4 h-4 animate-bounce" />
-                <span>Мгновенные уведомления администратора</span>
+                <ShieldCheck className="w-4 h-4" />
+                <span>{lang === 'ru' ? 'Ваши данные в безопасности' : 'Маалыматыңыз корголгон'}</span>
               </div>
               <p className="text-emerald-100 leading-relaxed">
-                Каждая заявка через форму сайта автоматически отправляется в Telegram-бот и
-                WhatsApp Business учителя с SMS-оповещением в течение 30 секунд.
+                {lang === 'ru'
+                  ? 'Заявка видна только учителю. Ответ придёт в удобный вам мессенджер или по телефону.'
+                  : 'Билдирмени мугалим гана көрөт. Жооп сизге ыңгайлуу мессенджерге же телефон аркылуу келет.'}
               </p>
             </div>
           </div>
@@ -215,7 +223,7 @@ export const ContactSection: React.FC<ContactSectionProps> = ({
           {/* Right Column: Interactive Booking Form */}
           <div className="lg:col-span-7">
             <div className="bg-white p-7 sm:p-9 rounded-2xl border border-stone-200/90 shadow-sm text-left">
-              {submissionResult ? (
+              {submittedName ? (
                 <div className="py-8 space-y-6 text-center">
                   <div className="w-16 h-16 bg-emerald-100 text-emerald-800 rounded-full flex items-center justify-center mx-auto">
                     <CheckCircle className="w-9 h-9" />
@@ -227,25 +235,14 @@ export const ContactSection: React.FC<ContactSectionProps> = ({
                     </h3>
                     <p className="text-stone-600 text-sm mt-1">
                       {lang === 'ru'
-                        ? `Уважаемый(ая) ${submissionResult.app.name}, Айгүл Бектемировна свяжется с вами в ближайшее время.`
-                        : `Урматтуу ${submissionResult.app.name}, Айгүл Бектемировна сиз менен жакын арада байланышат.`}
+                        ? `Уважаемый(ая) ${submittedName}, ${teacherProfile.shortName.ru} свяжется с вами в ближайшее время.`
+                        : `Урматтуу ${submittedName}, ${teacherProfile.shortName.kg} сиз менен жакын арада байланышат.`}
                     </p>
-                  </div>
-
-                  {/* Messenger Dispatch confirmation card */}
-                  <div className="bg-stone-50 border border-stone-200 p-4 rounded-xl text-left text-xs space-y-2 max-w-md mx-auto">
-                    <div className="font-bold text-stone-800 flex items-center gap-1.5 text-emerald-800">
-                      <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                      <span>Статус доставки уведомления педагогу:</span>
-                    </div>
-                    <div className="flex items-center justify-between text-stone-600">
-                      <span>Telegram Bot (@AigulTeacherOshBot):</span>
-                      <span className="font-semibold text-emerald-700">✓ Доставлено</span>
-                    </div>
-                    <div className="flex items-center justify-between text-stone-600">
-                      <span>WhatsApp Cloud API (+996 555 12-34-56):</span>
-                      <span className="font-semibold text-emerald-700">✓ Оповещен</span>
-                    </div>
+                    <p className="text-stone-500 text-xs mt-2">
+                      {lang === 'ru'
+                        ? 'Если вопрос срочный — напишите напрямую в WhatsApp.'
+                        : 'Шашылыш суроо болсо — WhatsApp аркылуу түз жазыңыз.'}
+                    </p>
                   </div>
 
                   {/* WhatsApp Direct Chat button */}
@@ -260,7 +257,7 @@ export const ContactSection: React.FC<ContactSectionProps> = ({
                       <span>{lang === 'ru' ? 'Написать напрямую в WhatsApp' : 'WhatsApp аркылуу жазуу'}</span>
                     </a>
                     <button
-                      onClick={() => setSubmissionResult(null)}
+                      onClick={() => setSubmittedName(null)}
                       className="px-5 py-3 text-xs font-semibold text-stone-700 bg-stone-100 hover:bg-stone-200 rounded-xl"
                     >
                       {lang === 'ru' ? 'Отправить ещё одну заявку' : 'Жаңы билдирме жөнөтүү'}
@@ -390,6 +387,13 @@ export const ContactSection: React.FC<ContactSectionProps> = ({
                     />
                   </div>
 
+                  {error && (
+                    <p role="alert" className="flex items-start gap-1.5 text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg p-2.5">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      <span>{error}</span>
+                    </p>
+                  )}
+
                   <div className="pt-2">
                     <button
                       type="submit"
@@ -403,16 +407,16 @@ export const ContactSection: React.FC<ContactSectionProps> = ({
                           <Send className="w-4 h-4" />
                           <span>
                             {lang === 'ru'
-                              ? 'Отправить заявку с уведомлением в мессенджеры'
-                              : 'Билдирмени мессенджерлерге жөнөтүү'}
+                              ? 'Отправить заявку'
+                              : 'Билдирмени жөнөтүү'}
                           </span>
                         </>
                       )}
                     </button>
                     <p className="text-[11px] text-stone-400 text-center mt-2">
                       {lang === 'ru'
-                        ? 'Администратор получает уведомление моментально через Telegram и WhatsApp'
-                        : 'Администратор Telegram жана WhatsApp аркылуу заматта билдирме алат'}
+                        ? 'Нажимая кнопку, вы соглашаетесь на обработку указанных данных для связи с вами.'
+                        : 'Баскычты басуу менен байланыш үчүн маалыматтарыңызды иштетүүгө макулдук бересиз.'}
                     </p>
                   </div>
                 </form>
