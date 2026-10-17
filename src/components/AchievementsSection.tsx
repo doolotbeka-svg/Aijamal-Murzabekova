@@ -94,6 +94,21 @@ export const AchievementsSection: React.FC<AchievementsSectionProps> = ({ lang }
                 className="bg-white rounded-2xl p-6 border border-stone-200/90 shadow-xs hover:shadow-md transition-all duration-300 flex flex-col justify-between group hover:border-emerald-600"
               >
                 <div>
+                  {item.imageUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedAward(item)}
+                      className="block w-full -mt-2 mb-4 rounded-xl overflow-hidden border border-stone-200 bg-stone-100 cursor-pointer"
+                      aria-label={lang === 'ru' ? 'Открыть фото' : 'Сүрөттү ачуу'}
+                    >
+                      <img
+                        src={item.imageUrl}
+                        alt={item.title[lang]}
+                        loading="lazy"
+                        className="w-full aspect-[4/3] object-cover group-hover:scale-[1.02] transition-transform duration-300"
+                      />
+                    </button>
+                  )}
                   <div className="flex items-center justify-between gap-2 mb-4">
                     <div
                       className={`w-10 h-10 rounded-xl flex items-center justify-center ${
@@ -156,8 +171,11 @@ export const AchievementsSection: React.FC<AchievementsSectionProps> = ({ lang }
 
         {/* Certificate Modal */}
         {selectedAward && (
-          <div className="fixed inset-0 z-50 bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-            <div className="bg-stone-50 w-full max-w-xl rounded-2xl shadow-2xl border-4 border-amber-200 p-8 relative text-center">
+          <div
+            className="fixed inset-0 z-50 bg-stone-900/60 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={(e) => e.target === e.currentTarget && setSelectedAward(null)}
+          >
+            <div className="bg-stone-50 w-full max-w-xl max-h-[92vh] overflow-y-auto rounded-2xl shadow-2xl border-4 border-amber-200 p-8 relative text-center">
               <button
                 onClick={() => setSelectedAward(null)}
                 className="absolute top-4 right-4 p-2 rounded-full text-stone-500 hover:text-stone-900 hover:bg-stone-200 transition-colors cursor-pointer"
@@ -165,10 +183,18 @@ export const AchievementsSection: React.FC<AchievementsSectionProps> = ({ lang }
                 <X className="w-5 h-5" />
               </button>
 
-              {/* Ornamental Frame Header */}
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-white shadow-lg ring-4 ring-amber-100">
-                <Medal className="w-8 h-8" />
-              </div>
+              {/* Photo of the award or certificate, when the teacher uploaded one */}
+              {selectedAward.imageUrl ? (
+                <img
+                  src={selectedAward.imageUrl}
+                  alt={selectedAward.title[lang]}
+                  className="w-full max-h-[55vh] object-contain rounded-xl border border-stone-200 bg-white mb-5"
+                />
+              ) : (
+                <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-white shadow-lg ring-4 ring-amber-100">
+                  <Medal className="w-8 h-8" />
+                </div>
+              )}
 
               <span className="text-[11px] font-bold uppercase tracking-widest text-amber-800 bg-amber-100 px-3 py-1 rounded-full">
                 {selectedAward.issuer[lang]}
