@@ -2,7 +2,15 @@ import express, { NextFunction, Request, Response } from 'express';
 import { GoogleGenAI } from '@google/genai';
 import crypto from 'crypto';
 import { mergeContent, type SiteContent } from '../data/content.js';
-import { readJson, writeJson, saveImage, readImage, isAllowedImageType } from './storage.js';
+import {
+  readJson,
+  writeJson,
+  saveImage,
+  readImage,
+  isAllowedImageType,
+  storageMode,
+  StorageNotConfiguredError,
+} from './storage.js';
 import type {
   ActivityEvent,
   AdminStats,
@@ -77,8 +85,17 @@ function clean(value: unknown, max: number): string {
 function handle(fn: (req: Request, res: Response) => Promise<void>) {
   return (req: Request, res: Response) => {
     fn(req, res).catch((err) => {
-      console.error(`${req.method} ${req.path} failed:`, err);
-      if (!res.headersSent) res.status(500).json({ error: 'Ошибка сервера. Попробуйте позже.' });
+      console.error(`${req.method} ${req.originalUrl} failed:`, err);
+      if (res.headersSent) return;
+      if (err instanceof StorageNotConfiguredError) {
+        res.status(503).json({ error: err.message });
+        return;
+      }
+      // The admin is authenticated, so show the real cause to make problems fixable
+      const isAdmin = req.originalUrl.startsWith('/api/admin');
+      res.status(500).json({
+        error: isAdmin ? `Ошибка сервера: ${err?.message || err}` : 'Ошибка сервера. Попробуйте позже.',
+      });
     });
   };
 }
@@ -465,7 +482,7 @@ export function createApiApp() {
         pendingReviews: db.reviews.filter((r) => r.status === 'pending').length,
         last7Days,
         recentActivities: db.activities.slice(0, 50),
-        integrations: { telegram: telegramEnabled, gemini: geminiEnabled, geminiModel: GEMINI_MODEL },
+        integrations: { telegram: telegramEnabled, gemini: geminiEnabled, geminiModel: GEMINI_MODEL, storage: storageMode },
       };
       res.json(stats);
     })
@@ -586,7 +603,7 @@ export function createApiApp() {
 
   admin.post(
     '/upload',
-    express.raw({ type: 'image/*', limit: '4mb' }),
+    express.raw({ type: () => true, limit: '4mb' }),
     handle(async (req, res) => {
       const contentType = String(req.headers['content-type'] || '').split(';')[0].trim();
       if (!isAllowedImageType(contentType) || !Buffer.isBuffer(req.body) || req.body.length === 0) {
@@ -610,6 +627,21 @@ export function createApiApp() {
 
   app.use('/api', (_req: Request, res: Response) => {
     res.status(404).json({ error: 'Not found' });
+  });
+
+  // Body parser errors (too large, broken JSON) as readable JSON instead of an HTML page
+  app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+    if (res.headersSent) return next(err);
+    console.error(`${req.method} ${req.originalUrl} failed:`, err);
+    if (err?.type === 'entity.too.large') {
+      res.status(413).json({ error: 'Слишком большой файл или текст (максимум 4 МБ)' });
+      return;
+    }
+    if (err?.type === 'entity.parse.failed') {
+      res.status(400).json({ error: 'Некорректные данные запроса' });
+      return;
+    }
+    res.status(500).json({ error: 'Ошибка сервера. Попробуйте позже.' });
   });
 
   return app;

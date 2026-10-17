@@ -356,6 +356,18 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({ lang, 
         </div>
       )}
 
+      {stats?.integrations.storage === 'missing' && (
+        <div className="px-5 py-3 bg-amber-50 border-b border-amber-300 text-xs text-amber-900 flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>
+            {t(
+              'Хранилище не подключено: заявки, отзывы, тексты и фото сейчас не сохраняются. В Vercel откройте проект → Storage → Create → Blob (доступ Private), подключите его к проекту и сделайте Redeploy.',
+              'Сактагыч туташкан эмес: билдирмелер, пикирлер, тексттер жана сүрөттөр сакталбайт. Vercelде долбоорду ачып → Storage → Create → Blob (Private) туташтырып, Redeploy жасаңыз.'
+            )}
+          </span>
+        </div>
+      )}
+
       {/* KPI Metric Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-stone-100 border-b border-stone-200">
         {[

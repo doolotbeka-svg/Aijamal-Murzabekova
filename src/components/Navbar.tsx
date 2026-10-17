@@ -1,18 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Language } from '../types';
 import { useContent } from '../ContentContext';
-import { BookOpen, Menu, X, PhoneCall, Sparkles } from 'lucide-react';
+import { BookOpen, Menu, X, PhoneCall } from 'lucide-react';
 
 interface NavbarProps {
   lang: Language;
   onLanguageChange: (lang: Language) => void;
-  onOpenChat: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
   lang,
   onLanguageChange,
-  onOpenChat,
 }) => {
   const { teacherProfile } = useContent();
   const [isScrolled, setIsScrolled] = useState(false);
@@ -104,16 +102,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             </div>
 
-            {/* AI Assistant Quick Pill */}
-            <button
-              onClick={onOpenChat}
-              className="flex items-center gap-1.5 px-3 py-1.5 whitespace-nowrap text-xs font-medium bg-amber-100/80 hover:bg-amber-200/90 text-amber-900 border border-amber-300/80 rounded-lg transition-colors cursor-pointer"
-              title={lang === 'ru' ? 'Задать вопрос ИИ-помощнику' : 'ИИ-жардамчыга суроо берүү'}
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-700 animate-spin" style={{ animationDuration: '6s' }} />
-              <span>{lang === 'ru' ? 'ИИ-Помощник' : 'ИИ-Кеңешчи'}</span>
-            </button>
-
             {/* Quick Contact CTA */}
             <a
               href="#contact"
@@ -161,16 +149,6 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
 
           <div className="pt-3 border-t border-stone-200 flex flex-col gap-2">
-            <button
-              onClick={() => {
-                setMobileMenuOpen(false);
-                onOpenChat();
-              }}
-              className="w-full flex items-center justify-center gap-2 py-2 px-3 text-sm font-medium bg-amber-100 text-amber-900 rounded-lg"
-            >
-              <Sparkles className="w-4 h-4 text-amber-700" />
-              <span>{lang === 'ru' ? 'Задать вопрос ИИ-Помощнику' : 'ИИ-Кеңешчиге суроо'}</span>
-            </button>
             <a
               href="#contact"
               onClick={() => setMobileMenuOpen(false)}

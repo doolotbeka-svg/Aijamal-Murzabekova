@@ -89,5 +89,5 @@ export interface AdminStats {
   pendingReviews: number;
   last7Days: { date: string; visits: number }[];
   recentActivities: ActivityEvent[];
-  integrations: { telegram: boolean; gemini: boolean; geminiModel: string };
+  integrations: { telegram: boolean; gemini: boolean; geminiModel: string; storage: 'blob' | 'local' | 'missing' };
 }

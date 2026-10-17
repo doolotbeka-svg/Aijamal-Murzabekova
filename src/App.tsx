@@ -75,7 +75,7 @@ export default function App() {
   return (
     <div className="min-h-screen bg-stone-50 text-stone-900 font-sans selection:bg-emerald-200 selection:text-emerald-900">
       {/* Sticky Navigation */}
-      <Navbar lang={lang} onLanguageChange={handleLanguageChange} onOpenChat={() => setChatBotOpen(true)} />
+      <Navbar lang={lang} onLanguageChange={handleLanguageChange} />
 
       <main>
         {/* Hero Section with Credo and Badges */}

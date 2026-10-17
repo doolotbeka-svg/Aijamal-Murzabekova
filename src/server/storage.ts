@@ -5,6 +5,19 @@ import crypto from 'crypto';
 
 // Private Vercel Blob in production; a local folder when no Blob token is configured (local dev)
 const useBlob = !!process.env.BLOB_READ_WRITE_TOKEN;
+// On Vercel the file system is read-only, so without a Blob store nothing can be saved
+const storageMissing = !useBlob && !!process.env.VERCEL;
+
+export const storageMode: 'blob' | 'local' | 'missing' = useBlob ? 'blob' : storageMissing ? 'missing' : 'local';
+
+export class StorageNotConfiguredError extends Error {
+  constructor() {
+    super(
+      'Хранилище не подключено. В Vercel откройте проект → Storage → Create → Blob (доступ Private), подключите его к проекту и сделайте Redeploy.'
+    );
+    this.name = 'StorageNotConfiguredError';
+  }
+}
 const LOCAL_DIR = path.resolve(process.env.DATA_DIR || path.join(process.cwd(), 'data'));
 
 function localPath(pathname: string): string {
@@ -14,6 +27,7 @@ function localPath(pathname: string): string {
 }
 
 export async function readJson<T>(pathname: string): Promise<T | null> {
+  if (storageMissing) return null;
   if (useBlob) {
     const res = await get(pathname, { access: 'private', useCache: false }).catch((err) => {
       if (err?.name === 'BlobNotFoundError') return null;
@@ -31,6 +45,7 @@ export async function readJson<T>(pathname: string): Promise<T | null> {
 }
 
 export async function writeJson(pathname: string, data: unknown): Promise<void> {
+  if (storageMissing) throw new StorageNotConfiguredError();
   const body = JSON.stringify(data);
   if (useBlob) {
     await put(pathname, body, {
@@ -63,6 +78,7 @@ export function isAllowedImageType(contentType: string) {
 export async function saveImage(data: Buffer, contentType: string): Promise<string> {
   const name = `${Date.now().toString(36)}-${crypto.randomBytes(6).toString('hex')}.${IMAGE_TYPES[contentType]}`;
   const pathname = `images/${name}`;
+  if (storageMissing) throw new StorageNotConfiguredError();
   if (useBlob) {
     await put(pathname, data, { access: 'private', addRandomSuffix: false, contentType });
     return name;
@@ -79,6 +95,7 @@ export async function readImage(name: string): Promise<{ data: Buffer; contentTy
   const pathname = `images/${name}`;
   const ext = name.split('.').pop()!;
   const contentType = Object.keys(IMAGE_TYPES).find((t) => IMAGE_TYPES[t] === ext)!;
+  if (storageMissing) return null;
   if (useBlob) {
     const res = await get(pathname, { access: 'private' }).catch((err) => {
       if (err?.name === 'BlobNotFoundError') return null;
