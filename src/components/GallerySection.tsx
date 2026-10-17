@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Language, GalleryItem } from '../types';
-import { galleryItems } from '../data/content';
+import { useContent } from '../ContentContext';
 import { Camera, Calendar, Maximize2, X, Sparkles } from 'lucide-react';
 
 interface GallerySectionProps {
@@ -8,6 +8,7 @@ interface GallerySectionProps {
 }
 
 export const GallerySection: React.FC<GallerySectionProps> = ({ lang }) => {
+  const { galleryItems } = useContent();
   const [activeTag, setActiveTag] = useState<string>('all');
   const [lightboxImage, setLightboxImage] = useState<GalleryItem | null>(null);
 
@@ -22,8 +23,8 @@ export const GallerySection: React.FC<GallerySectionProps> = ({ lang }) => {
 
   const filteredItems =
     activeTag === 'all'
-      ? galleryItems
-      : galleryItems.filter((item) => item.tag === activeTag);
+      ? galleryItems.filter((item) => item.imageUrl)
+      : galleryItems.filter((item) => item.imageUrl && item.tag === activeTag);
 
   return (
     <section id="gallery" className="py-20 bg-stone-100/60">

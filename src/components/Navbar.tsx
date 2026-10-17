@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Language } from '../types';
-import { teacherProfile } from '../data/content';
+import { useContent } from '../ContentContext';
 import { BookOpen, Menu, X, PhoneCall, Sparkles } from 'lucide-react';
 
 interface NavbarProps {
@@ -14,6 +14,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onLanguageChange,
   onOpenChat,
 }) => {
+  const { teacherProfile } = useContent();
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 

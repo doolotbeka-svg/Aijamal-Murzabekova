@@ -1,8 +1,8 @@
 import express, { NextFunction, Request, Response } from 'express';
 import { GoogleGenAI } from '@google/genai';
 import crypto from 'crypto';
-import { teacherProfile, schoolContactDetails } from '../data/content.js';
-import { readJson, writeJson } from './storage.js';
+import { mergeContent, type SiteContent } from '../data/content.js';
+import { readJson, writeJson, saveImage, readImage, isAllowedImageType } from './storage.js';
 import type {
   ActivityEvent,
   AdminStats,
@@ -26,6 +26,8 @@ interface Database {
 }
 
 const DB_PATH = 'db.json';
+const CONTENT_PATH = 'content.json';
+const MAX_CONTENT_BYTES = 900 * 1024;
 const MAX_ACTIVITIES = 200;
 
 function emptyDb(): Database {
@@ -46,6 +48,11 @@ async function loadDb(): Promise<Database> {
 
 async function saveDb(db: Database) {
   await writeJson(DB_PATH, db);
+}
+
+/** Site texts, contacts and photos as edited in the admin panel (defaults until the first save). */
+async function loadContent(): Promise<SiteContent> {
+  return mergeContent(await readJson(CONTENT_PATH));
 }
 
 function newId(prefix: string) {
@@ -183,10 +190,10 @@ const ai = geminiEnabled
     })
   : null;
 
-const teacherName = teacherProfile.fullName.ru;
-const teacherShort = teacherProfile.shortName.ru;
-
-const TEACHER_ASSISTANT_SYSTEM_PROMPT = `
+function buildSystemPrompt({ teacherProfile, schoolContactDetails }: SiteContent) {
+  const teacherName = teacherProfile.fullName.ru;
+  const teacherShort = teacherProfile.shortName.ru;
+  return `
 Вы — интерактивный ИИ-ассистент персонального сайта-портфолио учительницы начальных классов из города Ош (Кыргызстан) — ${teacherName} (к ней обращаются «${teacherShort}»).
 ${teacherShort} — ${teacherProfile.title.ru.toLowerCase()}, педагогический стаж ${teacherProfile.experienceYears} лет, место работы: ${teacherProfile.school.ru}.
 
@@ -202,8 +209,10 @@ ${teacherShort} — ${teacherProfile.title.ru.toLowerCase()}, педагогич
 
 Тон: сердечный, уважительный («Сиз / Вы»), тактичный. Длина ответа: 2–4 коротких абзаца, без markdown-разметки.
 `;
+}
 
-function fallbackReply(isKg: boolean) {
+function fallbackReply(isKg: boolean, { teacherProfile, schoolContactDetails }: SiteContent) {
+  const teacherShort = teacherProfile.shortName[isKg ? 'kg' : 'ru'];
   return isKg
     ? `Саламатсызбы! ${teacherShort} сизге кубаныч менен жардам берет.\n1-класска даярдануу үчүн баланы кыйнабай, эң башкысы — китепке кызыгуусун ойготуу, майда моторикасын өнүктүрүү жана өз алдынча болууга үйрөтүү маанилүү.\nСайттагы «Байланыш» формасы же WhatsApp (${schoolContactDetails.phoneDisplay}) аркылуу жеке консультацияга жазылсаңыз болот.`
     : `Здравствуйте! ${teacherShort} будет рада помочь.\nПри подготовке к 1 классу главное — не перегружать ребёнка механическим письмом и счётом, а развивать любознательность, внимание, моторику, самостоятельность и связную речь.\nЗаписаться на личную консультацию можно через форму «Контакты» внизу страницы или по WhatsApp ${schoolContactDetails.phoneDisplay}.`;
@@ -221,7 +230,34 @@ export function createApiApp() {
   const app = express();
   // Vercel / Cloud Run put the real client IP into X-Forwarded-For
   app.set('trust proxy', true);
-  app.use('/api', express.json({ limit: '32kb' }));
+  // Site content is edited as one JSON document, everything else is small
+  const smallJson = express.json({ limit: '32kb' });
+  const contentJson = express.json({ limit: '1mb' });
+  app.use('/api', (req, res, next) => (req.path === '/admin/content' ? contentJson : smallJson)(req, res, next));
+
+  app.get(
+    '/api/content',
+    handle(async (_req, res) => {
+      // Short CDN cache: edits show up within half a minute without a storage read per visitor
+      res.set('Cache-Control', 'public, max-age=0, s-maxage=30, stale-while-revalidate=300');
+      res.json(await loadContent());
+    })
+  );
+
+  app.get(
+    '/api/images/:name',
+    handle(async (req, res) => {
+      const image = await readImage(String(req.params.name));
+      if (!image) {
+        res.status(404).json({ error: 'Not found' });
+        return;
+      }
+      // Image names are unique per upload, so they can be cached forever
+      res.set('Cache-Control', 'public, max-age=31536000, immutable');
+      res.set('X-Content-Type-Options', 'nosniff');
+      res.type(image.contentType).send(image.data);
+    })
+  );
 
   app.post('/api/admin/login', rateLimit('login', 5, 15 * 60 * 1000), (req: Request, res: Response) => {
     if (!ADMIN_PASSWORD) {
@@ -269,8 +305,9 @@ export function createApiApp() {
       await saveDb(db);
 
       const isKg = lang === 'kg' || /[өүң]/i.test(message);
+      const content = await loadContent();
       if (!ai) {
-        res.json({ reply: fallbackReply(isKg), fallback: true });
+        res.json({ reply: fallbackReply(isKg, content), fallback: true });
         return;
       }
 
@@ -279,15 +316,15 @@ export function createApiApp() {
           model: GEMINI_MODEL,
           contents: [...history, { role: 'user', parts: [{ text: message }] }],
           config: {
-            systemInstruction: TEACHER_ASSISTANT_SYSTEM_PROMPT,
+            systemInstruction: buildSystemPrompt(content),
             temperature: 0.7,
             abortSignal: AbortSignal.timeout(20000),
           },
         });
-        res.json({ reply: response.text?.trim() || fallbackReply(isKg) });
+        res.json({ reply: response.text?.trim() || fallbackReply(isKg, content) });
       } catch (err) {
         console.warn('Gemini error, using fallback reply:', err);
-        res.json({ reply: fallbackReply(isKg), fallback: true });
+        res.json({ reply: fallbackReply(isKg, content), fallback: true });
       }
     })
   );
@@ -518,6 +555,46 @@ export function createApiApp() {
       }
       await saveDb(db);
       res.json({ success: true });
+    })
+  );
+
+  // Uncached read for the editor, so it always starts from the latest saved version
+  admin.get(
+    '/content',
+    handle(async (_req, res) => {
+      res.set('Cache-Control', 'no-store');
+      res.json(await loadContent());
+    })
+  );
+
+  admin.put(
+    '/content',
+    handle(async (req, res) => {
+      if (typeof req.body !== 'object' || req.body === null || Array.isArray(req.body)) {
+        res.status(400).json({ error: 'Invalid content' });
+        return;
+      }
+      const content = mergeContent(req.body);
+      if (Buffer.byteLength(JSON.stringify(content)) > MAX_CONTENT_BYTES) {
+        res.status(413).json({ error: 'Слишком много текста — сократите содержимое' });
+        return;
+      }
+      await writeJson(CONTENT_PATH, content);
+      res.json({ success: true, content });
+    })
+  );
+
+  admin.post(
+    '/upload',
+    express.raw({ type: 'image/*', limit: '4mb' }),
+    handle(async (req, res) => {
+      const contentType = String(req.headers['content-type'] || '').split(';')[0].trim();
+      if (!isAllowedImageType(contentType) || !Buffer.isBuffer(req.body) || req.body.length === 0) {
+        res.status(400).json({ error: 'Загрузите изображение JPG, PNG, WebP или GIF' });
+        return;
+      }
+      const name = await saveImage(req.body, contentType);
+      res.status(201).json({ url: `/api/images/${name}` });
     })
   );
 

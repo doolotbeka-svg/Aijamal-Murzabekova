@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Language, Achievement } from '../types';
-import { achievementsList } from '../data/content';
+import { useContent } from '../ContentContext';
 import {
   Award,
   Trophy,
@@ -19,6 +19,7 @@ interface AchievementsSectionProps {
 }
 
 export const AchievementsSection: React.FC<AchievementsSectionProps> = ({ lang }) => {
+  const { achievementsList } = useContent();
   const [activeTab, setActiveTab] = useState<'all' | 'teacher' | 'students'>('all');
   const [selectedAward, setSelectedAward] = useState<Achievement | null>(null);
 

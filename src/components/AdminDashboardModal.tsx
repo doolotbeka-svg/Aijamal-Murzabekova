@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Language, ApplicationRecord, ApplicationStatus, AdminStats, Review, ReviewStatus } from '../types';
-import { teacherProfile } from '../data/content';
+import { useContent } from '../ContentContext';
+import { ContentEditor } from './ContentEditor';
 import {
   X,
   Activity,
@@ -28,7 +29,7 @@ interface AdminDashboardModalProps {
   onClose: () => void;
 }
 
-type Tab = 'applications' | 'reviews' | 'activity' | 'settings';
+type Tab = 'applications' | 'reviews' | 'content' | 'activity' | 'settings';
 
 const TOKEN_KEY = 'teacher_admin_token';
 
@@ -55,7 +56,14 @@ function formatDateTime(iso: string) {
   });
 }
 
-export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({ lang, onClose }) => {
+export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({ lang, onClose: closePanel }) => {
+  const { teacherProfile } = useContent();
+  const [contentDirty, setContentDirty] = useState(false);
+  // Don't lose unsaved edits in the content editor by closing the panel
+  const onClose = useCallback(() => {
+    if (contentDirty && !confirm('Есть несохранённые изменения в содержимом сайта. Закрыть без сохранения?')) return;
+    closePanel();
+  }, [contentDirty, closePanel]);
   const t = (ru: string, kg: string) => (lang === 'ru' ? ru : kg);
 
   const [token, setToken] = useState<string | null>(() => {
@@ -296,6 +304,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({ lang, 
     { id: 'applications', label: `${t('Заявки', 'Билдирмелер')} (${applications.length})` },
     { id: 'reviews', label: `${t('Отзывы', 'Пикирлер')}${pendingReviews ? ` • ${pendingReviews} ${t('новых', 'жаңы')}` : ''}` },
     { id: 'activity', label: t('Активность', 'Активдүүлүк') },
+    { id: 'content', label: t('Содержимое сайта', 'Сайттын мазмуну') },
     { id: 'settings', label: t('Интеграции', 'Интеграциялар') },
   ];
 
@@ -656,6 +665,16 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({ lang, 
           </div>
         )}
 
+        {/* Kept mounted while hidden so switching tabs does not drop unsaved edits */}
+        <div className={activeTab === 'content' ? '' : 'hidden'}>
+          <ContentEditor
+            lang={lang}
+            token={token}
+            onUnauthorized={() => saveToken(null)}
+            onDirtyChange={setContentDirty}
+          />
+        </div>
+
         {activeTab === 'settings' && (
           <div className="space-y-4 text-xs">
             <div className="bg-white p-5 rounded-xl border border-stone-200 space-y-3">
@@ -727,8 +746,8 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({ lang, 
               <Settings className="w-5 h-5 text-stone-500 shrink-0" />
               <p className="text-stone-600 leading-relaxed">
                 {t(
-                  'Имя, телефон, Telegram, почта и тексты сайта редактируются в файле src/data/content.ts. Пароль этой панели задаётся переменной ADMIN_PASSWORD.',
-                  'Аты-жөнү, телефон, Telegram, почта жана сайттын тексттери src/data/content.ts файлында өзгөртүлөт. Бул панелдин сырсөзү ADMIN_PASSWORD өзгөрмөсү менен коюлат.'
+                  'Имя, фото, контакты и все тексты сайта меняются во вкладке «Содержимое сайта». Пароль этой панели задаётся переменной ADMIN_PASSWORD в настройках Vercel.',
+                  'Аты-жөнү, сүрөт, байланыштар жана сайттын бардык тексттери «Сайттын мазмуну» өтмөгүндө өзгөртүлөт. Бул панелдин сырсөзү Vercelдеги ADMIN_PASSWORD өзгөрмөсү менен коюлат.'
                 )}
               </p>
             </div>

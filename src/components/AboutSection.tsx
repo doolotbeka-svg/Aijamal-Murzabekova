@@ -1,6 +1,6 @@
 import React from 'react';
 import { Language } from '../types';
-import { teacherProfile } from '../data/content';
+import { useContent } from '../ContentContext';
 import {
   GraduationCap,
   Award,
@@ -17,6 +17,7 @@ interface AboutSectionProps {
 }
 
 export const AboutSection: React.FC<AboutSectionProps> = ({ lang }) => {
+  const { teacherProfile } = useContent();
   return (
     <section id="about" className="py-20 bg-stone-50 border-t border-stone-200/80">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

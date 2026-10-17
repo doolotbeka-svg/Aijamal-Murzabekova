@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Language } from '../types';
-import { schoolContactDetails, teacherProfile } from '../data/content';
+import { useContent } from '../ContentContext';
 import {
   MessageCircle,
   X,
@@ -27,6 +27,7 @@ interface Message {
 }
 
 export const AiChatbot: React.FC<AiChatbotProps> = ({ lang, isOpen, onToggle }) => {
+  const { schoolContactDetails, teacherProfile } = useContent();
   // The greeting is rendered from the current language, so it follows the RU/KG switch
   const greeting: Message = {
     id: 'init-1',

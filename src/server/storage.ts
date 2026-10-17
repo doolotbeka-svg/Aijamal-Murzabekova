@@ -1,6 +1,7 @@
 import { put, get } from '@vercel/blob';
 import { promises as fs } from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 
 // Private Vercel Blob in production; a local folder when no Blob token is configured (local dev)
 const useBlob = !!process.env.BLOB_READ_WRITE_TOKEN;
@@ -45,4 +46,51 @@ export async function writeJson(pathname: string, data: unknown): Promise<void> 
   const tmp = `${file}.tmp`;
   await fs.writeFile(tmp, body);
   await fs.rename(tmp, file);
+}
+
+const IMAGE_TYPES: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'image/gif': 'gif',
+};
+
+export function isAllowedImageType(contentType: string) {
+  return contentType in IMAGE_TYPES;
+}
+
+/** Saves an uploaded image under a random name and returns that name. */
+export async function saveImage(data: Buffer, contentType: string): Promise<string> {
+  const name = `${Date.now().toString(36)}-${crypto.randomBytes(6).toString('hex')}.${IMAGE_TYPES[contentType]}`;
+  const pathname = `images/${name}`;
+  if (useBlob) {
+    await put(pathname, data, { access: 'private', addRandomSuffix: false, contentType });
+    return name;
+  }
+  const file = localPath(pathname);
+  await fs.mkdir(path.dirname(file), { recursive: true });
+  await fs.writeFile(file, data);
+  return name;
+}
+
+/** Reads an image saved by saveImage; null when it does not exist. */
+export async function readImage(name: string): Promise<{ data: Buffer; contentType: string } | null> {
+  if (!/^[a-z0-9-]+\.(jpg|png|webp|gif)$/.test(name)) return null;
+  const pathname = `images/${name}`;
+  const ext = name.split('.').pop()!;
+  const contentType = Object.keys(IMAGE_TYPES).find((t) => IMAGE_TYPES[t] === ext)!;
+  if (useBlob) {
+    const res = await get(pathname, { access: 'private' }).catch((err) => {
+      if (err?.name === 'BlobNotFoundError') return null;
+      throw err;
+    });
+    if (!res || res.statusCode !== 200 || !res.stream) return null;
+    return { data: Buffer.from(await new Response(res.stream).arrayBuffer()), contentType };
+  }
+  try {
+    return { data: await fs.readFile(localPath(pathname)), contentType };
+  } catch (err: any) {
+    if (err?.code === 'ENOENT') return null;
+    throw err;
+  }
 }

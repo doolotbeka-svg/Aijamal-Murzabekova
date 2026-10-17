@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Language } from '../types';
-import { schoolContactDetails, teacherProfile } from '../data/content';
+import { useContent } from '../ContentContext';
 import {
   MapPin,
   Phone,
@@ -21,6 +21,7 @@ interface ContactSectionProps {
 }
 
 export const ContactSection: React.FC<ContactSectionProps> = ({ lang }) => {
+  const { schoolContactDetails, teacherProfile } = useContent();
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('+996 ');
   const [purpose, setPurpose] = useState('Запись на консультацию по приёму в 1-й класс');

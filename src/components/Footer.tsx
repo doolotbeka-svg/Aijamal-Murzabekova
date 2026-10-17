@@ -1,13 +1,14 @@
 import React from 'react';
 import { Language } from '../types';
 import { BookOpen, Heart, MapPin, Phone, Mail, Award } from 'lucide-react';
-import { teacherProfile, schoolContactDetails } from '../data/content';
+import { useContent } from '../ContentContext';
 
 interface FooterProps {
   lang: Language;
 }
 
 export const Footer: React.FC<FooterProps> = ({ lang }) => {
+  const { teacherProfile, schoolContactDetails } = useContent();
   return (
     <footer className="bg-stone-900 text-stone-300 pt-16 pb-12 border-t border-stone-800">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

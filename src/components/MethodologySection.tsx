@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { Language, MethodMaterial } from '../types';
-import { methodologicalMaterials, teacherProfile } from '../data/content';
+import { useContent } from '../ContentContext';
 
 function escapeHtml(text: string) {
   return text.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 }
 
 /** Builds a Word-compatible (.doc) lesson plan from the material and starts the download. */
-function downloadLessonPlan(material: MethodMaterial, lang: Language) {
+function downloadLessonPlan(material: MethodMaterial, lang: Language, author: string) {
   const L = (v: { ru: string; kg: string }) => escapeHtml(v[lang]);
   const labels =
     lang === 'ru'
@@ -24,7 +24,7 @@ function downloadLessonPlan(material: MethodMaterial, lang: Language) {
 <h2>${labels.goals}</h2><p>${L(material.contentPreview.goals)}</p>
 <h2>${labels.equipment}</h2><p>${L(material.contentPreview.equipment)}</p>
 <h2>${labels.stages}</h2><ol>${stages}</ol>
-<p class="meta">${labels.author}: ${escapeHtml(teacherProfile.fullName[lang])}, ${escapeHtml(teacherProfile.school[lang])}</p>
+<p class="meta">${labels.author}: ${escapeHtml(author)}</p>
 </body></html>`;
   const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
   const url = URL.createObjectURL(blob);
@@ -58,6 +58,7 @@ export const MethodologySection: React.FC<MethodologySectionProps> = ({
   lang,
   onTrackDownload,
 }) => {
+  const { methodologicalMaterials, teacherProfile } = useContent();
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [selectedMaterial, setSelectedMaterial] = useState<MethodMaterial | null>(null);
   const [downloadSuccessModal, setDownloadSuccessModal] = useState<string | null>(null);
@@ -76,7 +77,7 @@ export const MethodologySection: React.FC<MethodologySectionProps> = ({
       : methodologicalMaterials.filter((m) => m.category === activeCategory);
 
   const handleDownload = (material: MethodMaterial) => {
-    downloadLessonPlan(material, lang);
+    downloadLessonPlan(material, lang, `${teacherProfile.fullName[lang]}, ${teacherProfile.school[lang]}`);
     onTrackDownload(material);
     setDownloadSuccessModal(material.title[lang]);
     setTimeout(() => {

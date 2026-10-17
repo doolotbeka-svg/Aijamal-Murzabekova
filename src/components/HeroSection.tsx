@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Language } from '../types';
-import { teacherProfile } from '../data/content';
+import { useContent } from '../ContentContext';
 import {
   Award,
   Sparkles,
@@ -24,8 +24,10 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
   onOpenBooking,
   onOpenAchievements,
 }) => {
+  const { teacherProfile } = useContent();
   // Until a real photo is added to public/, show the teacher's initials instead
-  const [photoFailed, setPhotoFailed] = useState(false);
+  const [failedPhotoUrl, setFailedPhotoUrl] = useState<string | null>(null);
+  const photoFailed = !teacherProfile.photoUrl || failedPhotoUrl === teacherProfile.photoUrl;
 
   return (
     <section className="relative pt-28 pb-16 md:pt-36 md:pb-24 overflow-hidden bg-gradient-to-b from-amber-50/70 via-stone-50 to-emerald-50/30">
@@ -107,25 +109,25 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
             {/* Quick Metrics Bar */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 border-t border-stone-200/90">
               <div className="p-3 bg-white/70 rounded-xl border border-stone-200/60">
-                <div className="font-serif text-2xl font-bold text-emerald-900">16+</div>
+                <div className="font-serif text-2xl font-bold text-emerald-900">{`${teacherProfile.experienceYears}+`}</div>
                 <div className="text-xs text-stone-600 font-medium">
                   {lang === 'ru' ? 'лет стажа' : 'жылдык тажрыйба'}
                 </div>
               </div>
               <div className="p-3 bg-white/70 rounded-xl border border-stone-200/60">
-                <div className="font-serif text-2xl font-bold text-emerald-900">480+</div>
+                <div className="font-serif text-2xl font-bold text-emerald-900">{`${teacherProfile.graduatesCount}+`}</div>
                 <div className="text-xs text-stone-600 font-medium">
                   {lang === 'ru' ? 'выпускников' : 'бүтүрүүчү'}
                 </div>
               </div>
               <div className="p-3 bg-white/70 rounded-xl border border-stone-200/60">
-                <div className="font-serif text-2xl font-bold text-emerald-900">45</div>
+                <div className="font-serif text-2xl font-bold text-emerald-900">{teacherProfile.openLessonsCount}</div>
                 <div className="text-xs text-stone-600 font-medium">
                   {lang === 'ru' ? 'открытых уроков' : 'ачык сабактар'}
                 </div>
               </div>
               <div className="p-3 bg-white/70 rounded-xl border border-stone-200/60">
-                <div className="font-serif text-2xl font-bold text-emerald-900">32</div>
+                <div className="font-serif text-2xl font-bold text-emerald-900">{teacherProfile.olympiadWinnersCount}</div>
                 <div className="text-xs text-stone-600 font-medium">
                   {lang === 'ru' ? 'призёра олимпиад' : 'олимпиада жеңүүчүсү'}
                 </div>
@@ -155,7 +157,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                       alt={teacherProfile.fullName[lang]}
                       className="w-full h-full object-cover object-center"
                       loading="eager"
-                      onError={() => setPhotoFailed(true)}
+                      onError={() => setFailedPhotoUrl(teacherProfile.photoUrl)}
                     />
                   )}
                   <div className="absolute inset-0 bg-gradient-to-t from-stone-950/70 via-transparent to-transparent" />
@@ -163,7 +165,7 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                   {/* Badges on photo */}
                   <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-md px-3 py-1 rounded-full text-xs font-bold text-stone-800 shadow-md flex items-center gap-1.5 border border-amber-200">
                     <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-                    <span>Высшая категория</span>
+                    <span>{teacherProfile.photoBadge[lang]}</span>
                   </div>
 
                   {/* Caption on image */}
@@ -172,24 +174,29 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
                       {teacherProfile.fullName[lang]}
                     </p>
                     <p className="text-xs text-amber-200 font-medium">
-                      {lang === 'ru'
-                        ? '1–4 классы • Наставник молодых учителей г. Ош'
-                        : '1–4-класстар • Ош ш. жаш мугалимдердин насаатчысы'}
+                      {teacherProfile.photoCaption[lang]}
                     </p>
                   </div>
                 </div>
 
                 {/* Micro trust chips below photo */}
-                <div className="mt-3 grid grid-cols-2 gap-2 text-left">
-                  <div className="p-2.5 bg-amber-50/70 rounded-lg border border-amber-100 text-xs">
-                    <div className="font-semibold text-amber-900">Билингвальное развитие</div>
-                    <div className="text-stone-600 text-[11px]">Кыргызча & Русский</div>
+                {teacherProfile.heroHighlights.length > 0 && (
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-left">
+                    {teacherProfile.heroHighlights.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className={`p-2.5 rounded-lg border text-xs ${
+                          idx % 2 === 0 ? 'bg-amber-50/70 border-amber-100' : 'bg-emerald-50/70 border-emerald-100'
+                        }`}
+                      >
+                        <div className={`font-semibold ${idx % 2 === 0 ? 'text-amber-900' : 'text-emerald-900'}`}>
+                          {item.title[lang]}
+                        </div>
+                        <div className="text-stone-600 text-[11px]">{item.text[lang]}</div>
+                      </div>
+                    ))}
                   </div>
-                  <div className="p-2.5 bg-emerald-50/70 rounded-lg border border-emerald-100 text-xs">
-                    <div className="font-semibold text-emerald-900">Приём в 1 класс 2026/27</div>
-                    <div className="text-stone-600 text-[11px]">Консультации открыты</div>
-                  </div>
-                </div>
+                )}
               </div>
             </div>
           </div>

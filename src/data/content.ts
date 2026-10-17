@@ -31,8 +31,26 @@ export const teacherProfile = {
     ru: 'Школа-гимназия №4 им. Кирова, г. Ош',
     kg: 'Ош ш., Киров атындагы №4 мектеп-гимназиясы',
   },
-  // ⚠️ Фото учителя: положите настоящее фото в public/teacher-photo.jpg (или укажите другую ссылку)
-  photoUrl: '/teacher-photo.jpg',
+  // Фото загружается в админ-панели (вкладка «Содержимое сайта»); пока его нет, показываются инициалы
+  photoUrl: '',
+  photoBadge: {
+    ru: 'Высшая категория',
+    kg: 'Жогорку категория',
+  },
+  photoCaption: {
+    ru: '1–4 классы • Наставник молодых учителей г. Ош',
+    kg: '1–4-класстар • Ош ш. жаш мугалимдердин насаатчысы',
+  },
+  heroHighlights: [
+    {
+      title: { ru: 'Билингвальное развитие', kg: 'Эки тилде өнүгүү' },
+      text: { ru: 'Кыргызча & Русский', kg: 'Кыргызча & Орусча' },
+    },
+    {
+      title: { ru: 'Приём в 1 класс 2026/27', kg: '1-класска кабыл алуу 2026/27' },
+      text: { ru: 'Консультации открыты', kg: 'Консультациялар ачык' },
+    },
+  ],
   experienceYears: 16,
   graduatesCount: 480,
   openLessonsCount: 45,
@@ -601,8 +619,7 @@ export const galleryItems: GalleryItem[] = [
   },
 ];
 
-// ⚠️ КОНТАКТЫ: замените значения ниже на настоящие данные учителя.
-// Все компоненты сайта, чат-бот и сервер берут телефон / Telegram / почту только отсюда.
+// Контакты по умолчанию; настоящие значения задаются в админ-панели (вкладка «Содержимое сайта»).
 export const schoolContactDetails = {
   address: {
     ru: 'Кыргызстан, г. Ош, ул. Ленина, 182 (Школа-гимназия №4 им. С. М. Кирова)',
@@ -619,3 +636,44 @@ export const schoolContactDetails = {
     kg: 'Дүйшөмбү – Жума: 08:00 – 17:30 (ата-энелерди кабыл алуу: Шейш/Бейш 14:00 – 16:30)',
   },
 };
+
+/**
+ * Default site content. The live version is edited in the admin panel and stored on the server;
+ * these values are used until the first save and to fill fields added in later code versions.
+ */
+export const defaultContent = {
+  teacherProfile,
+  schoolContactDetails,
+  methodologicalMaterials,
+  achievementsList,
+  galleryItems,
+};
+
+export type SiteContent = typeof defaultContent;
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+/** Overlays stored content on the defaults: missing or mistyped fields fall back to the default value. */
+function mergeValue(fallback: unknown, stored: unknown): unknown {
+  if (stored === undefined || stored === null) return fallback;
+  if (Array.isArray(fallback)) {
+    if (!Array.isArray(stored)) return fallback;
+    const template = fallback[0];
+    return template === undefined ? stored : stored.map((item) => mergeValue(template, item));
+  }
+  if (isPlainObject(fallback)) {
+    if (!isPlainObject(stored)) return fallback;
+    const result: Record<string, unknown> = {};
+    for (const key of Object.keys(fallback)) result[key] = mergeValue(fallback[key], stored[key]);
+    // Keep optional keys that only exist in stored items (e.g. an added imageUrl)
+    for (const key of Object.keys(stored)) if (!(key in result)) result[key] = stored[key];
+    return result;
+  }
+  return typeof stored === typeof fallback ? stored : fallback;
+}
+
+export function mergeContent(stored: unknown): SiteContent {
+  return mergeValue(defaultContent, stored) as SiteContent;
+}
