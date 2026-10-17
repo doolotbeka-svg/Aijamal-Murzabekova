@@ -26,10 +26,10 @@ interface ContentEditorProps {
 type Section = keyof SiteContent;
 
 const SECTIONS: { id: Section; ru: string; kg: string }[] = [
-  { id: 'teacherProfile', ru: 'Профиль и главная', kg: 'Профиль' },
+  { id: 'teacherProfile', ru: 'Фото и профиль', kg: 'Сүрөт жана профиль' },
+  { id: 'galleryItems', ru: 'Галерея (фото)', kg: 'Галерея (сүрөттөр)' },
   { id: 'schoolContactDetails', ru: 'Контакты', kg: 'Байланыш' },
   { id: 'achievementsList', ru: 'Достижения', kg: 'Сыйлыктар' },
-  { id: 'galleryItems', ru: 'Галерея', kg: 'Галерея' },
   { id: 'methodologicalMaterials', ru: 'Методические материалы', kg: 'Усулдук материалдар' },
 ];
 
@@ -154,6 +154,16 @@ function defaultAt(path: (string | number)[]): Json | undefined {
     node = typeof step === 'number' ? node[0] : node[step];
   }
   return node;
+}
+
+function itemImage(item: Json): string {
+  if (item && typeof item === 'object' && !Array.isArray(item)) {
+    for (const key of IMAGE_KEYS) {
+      const v = (item as any)[key];
+      if (typeof v === 'string' && v) return v;
+    }
+  }
+  return '';
 }
 
 function itemTitle(item: Json, lang: Language, index: number): string {
@@ -289,12 +299,12 @@ export const ContentEditor: React.FC<ContentEditorProps> = ({ lang, token, onUna
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-1.5 text-[11px] font-semibold">
+      <div className="flex gap-1.5 text-xs font-semibold overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 sm:flex-wrap pb-1">
         {SECTIONS.map((s) => (
           <button
             key={s.id}
             onClick={() => setSection(s.id)}
-            className={`px-2.5 py-1 rounded-full border cursor-pointer ${
+            className={`shrink-0 px-3 py-1.5 rounded-full border cursor-pointer ${
               section === s.id
                 ? 'bg-emerald-800 text-white border-emerald-800'
                 : 'bg-white text-stone-600 border-stone-200 hover:bg-stone-100'
@@ -307,12 +317,17 @@ export const ContentEditor: React.FC<ContentEditorProps> = ({ lang, token, onUna
 
       <p className="text-xs text-stone-500">
         {t(
-          'Для каждого текста есть две версии: на русском (RU) и на кыргызском (KG). Изменения появятся на сайте после нажатия «Сохранить».',
-          'Ар бир текст эки тилде: орусча (RU) жана кыргызча (KG). Өзгөрүүлөр «Сактоо» баскычынан кийин сайтта көрүнөт.'
+          'Выберите раздел, измените тексты или нажмите «Загрузить фото», затем нажмите «Сохранить» внизу. У каждого текста две версии: на русском (RU) и на кыргызском (KG).',
+          'Бөлүмдү тандап, текстти өзгөртүңүз же «Сүрөт жүктөө» баскычын басыңыз, андан кийин «Сактоо». Ар бир текст эки тилде: орусча (RU) жана кыргызча (KG).'
         )}
       </p>
 
       <div className="bg-white p-4 sm:p-5 rounded-xl border border-stone-200 space-y-4">
+        {Array.isArray(draft[section]) && (
+          <p className="text-xs text-stone-500">
+            {t('Нажмите на пункт, чтобы открыть его и изменить текст или фото.', 'Өзгөртүү үчүн пунктту басыңыз.')}
+          </p>
+        )}
         <FieldEditor
           value={draft[section] as unknown as Json}
           onChange={updateSection}
@@ -324,8 +339,8 @@ export const ContentEditor: React.FC<ContentEditorProps> = ({ lang, token, onUna
       </div>
 
       {/* Sticky save bar */}
-      <div className="sticky bottom-0 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 bg-stone-50/95 backdrop-blur border-t border-stone-200 flex flex-wrap items-center justify-between gap-3">
-        <div className="text-xs min-h-[1rem]">
+      <div className="sticky -bottom-4 sm:-bottom-6 -mx-4 sm:-mx-6 -mb-4 sm:-mb-6 px-4 sm:px-6 py-3 bg-white/95 backdrop-blur border-t border-stone-200 shadow-[0_-4px_12px_rgba(0,0,0,0.04)] flex flex-wrap items-center justify-between gap-2">
+        <div className="text-xs min-h-[1rem] flex-1 min-w-[10rem]">
           {status ? (
             <span className={`flex items-center gap-1.5 ${status.kind === 'ok' ? 'text-emerald-700' : 'text-red-700'}`}>
               {status.kind === 'ok' ? <CheckCircle className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
@@ -352,7 +367,7 @@ export const ContentEditor: React.FC<ContentEditorProps> = ({ lang, token, onUna
           <button
             onClick={save}
             disabled={!dirty || saving}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-emerald-800 hover:bg-emerald-900 rounded-lg disabled:opacity-40 cursor-pointer"
+            className="flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold text-white bg-emerald-800 hover:bg-emerald-900 rounded-lg disabled:opacity-40 cursor-pointer"
           >
             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
             {t('Сохранить', 'Сактоо')}
@@ -449,7 +464,18 @@ const FieldEditor: React.FC<FieldEditorProps> = ({ value, onChange, path, sectio
         {value.map((item, idx) => (
           <details key={idx} className="group border border-stone-200 rounded-lg bg-stone-50/60" open={value.length <= 2}>
             <summary className="flex items-center justify-between gap-2 px-3 py-2 cursor-pointer select-none">
-              <span className="text-xs font-semibold text-stone-800 truncate">{itemTitle(item, lang, idx)}</span>
+              <span className="flex items-center gap-2 min-w-0">
+                {itemImage(item) && (
+                  <img
+                    key={itemImage(item)}
+                    src={itemImage(item)}
+                    alt=""
+                    onError={(e) => (e.currentTarget.style.visibility = 'hidden')}
+                    className="w-10 h-10 rounded-md object-cover shrink-0 border border-stone-200 bg-stone-100"
+                  />
+                )}
+                <span className="text-xs font-semibold text-stone-800 truncate">{itemTitle(item, lang, idx)}</span>
+              </span>
               <span className="flex items-center gap-0.5 shrink-0" onClick={(e) => e.preventDefault()}>
                 <IconButton title="Выше" disabled={idx === 0} onClick={() => move(idx, idx - 1)}>
                   <ArrowUp className="w-3.5 h-3.5" />
@@ -495,6 +521,8 @@ const FieldEditor: React.FC<FieldEditorProps> = ({ value, onChange, path, sectio
       <div className="space-y-4">
         {Object.entries(value)
           .filter(([k]) => !HIDDEN_KEYS.has(k))
+          // Photos first, so they are easy to find
+          .sort(([a], [b]) => Number(IMAGE_KEYS.has(b)) - Number(IMAGE_KEYS.has(a)))
           .map(([k, v]) => (
             <div key={k}>
               <div className="text-xs font-semibold text-stone-700 mb-1">{LABELS[k] || k}</div>
@@ -562,17 +590,30 @@ const ImageField: React.FC<{
   };
 
   return (
-    <div className="flex flex-col sm:flex-row gap-3 items-start">
-      <div className="w-32 h-32 shrink-0 rounded-lg border border-stone-200 bg-stone-100 overflow-hidden flex items-center justify-center text-stone-400">
-        {value ? <img src={value} alt="" className="w-full h-full object-cover" /> : <ImagePlus className="w-8 h-8" />}
-      </div>
+    <div className="flex flex-col sm:flex-row gap-3 items-start p-3 rounded-lg bg-emerald-50/50 border border-emerald-100">
+      <button
+        type="button"
+        onClick={() => inputRef.current?.click()}
+        disabled={busy}
+        title={t('Выбрать фото', 'Сүрөт тандоо')}
+        className="w-full sm:w-40 h-48 sm:h-40 shrink-0 rounded-lg border-2 border-dashed border-stone-300 bg-white overflow-hidden flex flex-col items-center justify-center gap-1 text-stone-400 hover:border-emerald-600 hover:text-emerald-700 cursor-pointer"
+      >
+        {value ? (
+          <img src={value} alt="" className="w-full h-full object-cover" />
+        ) : (
+          <>
+            <ImagePlus className="w-8 h-8" />
+            <span className="text-xs font-semibold">{t('Нет фото', 'Сүрөт жок')}</span>
+          </>
+        )}
+      </button>
       <div className="space-y-2 flex-1 w-full">
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() => inputRef.current?.click()}
             disabled={busy}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-emerald-700 hover:bg-emerald-800 rounded-lg disabled:opacity-50 cursor-pointer"
+            className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white bg-emerald-700 hover:bg-emerald-800 rounded-lg disabled:opacity-50 cursor-pointer"
           >
             {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ImagePlus className="w-3.5 h-3.5" />}
             {value ? t('Заменить фото', 'Сүрөттү алмаштыруу') : t('Загрузить фото', 'Сүрөт жүктөө')}
@@ -597,7 +638,10 @@ const ImageField: React.FC<{
         />
         {error && <p className="text-xs text-red-700">{error}</p>}
         <p className="text-[11px] text-stone-400">
-          {t('Большие фото автоматически уменьшаются перед загрузкой.', 'Чоң сүрөттөр жүктөлөр алдында кичирейтилет.')}
+          {t(
+            'JPG, PNG или WebP. Большие фото уменьшаются автоматически. После загрузки нажмите «Сохранить» внизу.',
+            'JPG, PNG же WebP. Чоң сүрөттөр автоматтык түрдө кичирейтилет. Жүктөгөндөн кийин ылдыйдагы «Сактоо» баскычын басыңыз.'
+          )}
         </p>
       </div>
     </div>

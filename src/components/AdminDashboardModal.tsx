@@ -22,6 +22,8 @@ import {
   Trash2,
   Bot,
   Settings,
+  FileText,
+  BarChart3,
 } from 'lucide-react';
 
 interface AdminDashboardModalProps {
@@ -82,7 +84,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({ lang, 
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState('');
-  const [activeTab, setActiveTab] = useState<Tab>('applications');
+  const [activeTab, setActiveTab] = useState<Tab>('content');
   const [statusFilter, setStatusFilter] = useState<ApplicationStatus | 'all'>('all');
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [telegramTest, setTelegramTest] = useState('');
@@ -236,7 +238,9 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({ lang, 
 
   const shell = (children: React.ReactNode) => (
     <div
-      className="fixed inset-0 z-50 bg-stone-950/75 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 overflow-y-auto"
+      className={`fixed inset-0 z-50 bg-stone-950/75 backdrop-blur-md flex items-center justify-center overflow-y-auto ${
+        token ? 'sm:p-6' : 'p-3 sm:p-6'
+      }`}
       role="dialog"
       aria-modal="true"
       aria-label={t('Админ-панель', 'Админ панели')}
@@ -300,26 +304,34 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({ lang, 
   const pendingReviews = reviews.filter((r) => r.status === 'pending').length;
   const maxDaily = Math.max(1, ...(stats?.last7Days.map((d) => d.visits) || [0]));
 
-  const tabs: { id: Tab; label: string }[] = [
-    { id: 'applications', label: `${t('Заявки', 'Билдирмелер')} (${applications.length})` },
-    { id: 'reviews', label: `${t('Отзывы', 'Пикирлер')}${pendingReviews ? ` • ${pendingReviews} ${t('новых', 'жаңы')}` : ''}` },
-    { id: 'activity', label: t('Активность', 'Активдүүлүк') },
-    { id: 'content', label: t('Содержимое сайта', 'Сайттын мазмуну') },
-    { id: 'settings', label: t('Интеграции', 'Интеграциялар') },
+  const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
+    { id: 'content', label: t('Тексты и фото', 'Тексттер жана сүрөттөр'), icon: <FileText className="w-4 h-4" /> },
+    {
+      id: 'applications',
+      label: `${t('Заявки', 'Билдирмелер')}${stats?.newApplications ? ` • ${stats.newApplications}` : ''}`,
+      icon: <FileCheck className="w-4 h-4" />,
+    },
+    {
+      id: 'reviews',
+      label: `${t('Отзывы', 'Пикирлер')}${pendingReviews ? ` • ${pendingReviews}` : ''}`,
+      icon: <Star className="w-4 h-4" />,
+    },
+    { id: 'activity', label: t('Статистика', 'Статистика'), icon: <BarChart3 className="w-4 h-4" /> },
+    { id: 'settings', label: t('Интеграции', 'Интеграциялар'), icon: <Settings className="w-4 h-4" /> },
   ];
 
   return shell(
-    <div className="bg-stone-50 w-full max-w-5xl rounded-2xl shadow-2xl border border-stone-300 overflow-hidden flex flex-col max-h-[94vh] text-left">
+    <div className="bg-stone-50 w-full max-w-5xl h-[100dvh] sm:h-[92vh] sm:rounded-2xl shadow-2xl sm:border border-stone-300 overflow-hidden flex flex-col text-left">
       {/* Top Header */}
-      <div className="bg-stone-900 text-white p-4 sm:p-5 flex items-center justify-between gap-3">
+      <div className="shrink-0 bg-stone-900 text-white px-4 py-3 sm:p-5 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-10 h-10 rounded-xl bg-emerald-600/30 border border-emerald-500/50 text-emerald-400 flex items-center justify-center shrink-0">
+          <div className="hidden sm:flex w-10 h-10 rounded-xl bg-emerald-600/30 border border-emerald-500/50 text-emerald-400 items-center justify-center shrink-0">
             <ShieldCheck className="w-5 h-5" />
           </div>
           <div className="min-w-0">
             <h3 className="font-serif text-lg sm:text-xl font-bold truncate">{t('Админ-панель сайта', 'Сайттын админ панели')}</h3>
-            <p className="text-xs text-stone-400 truncate">
-              {t('Заявки родителей, отзывы и статистика посещений', 'Ата-энелердин билдирмелери, пикирлер жана статистика')}
+            <p className="hidden sm:block text-xs text-stone-400 truncate">
+              {t('Тексты и фото сайта, заявки родителей, отзывы', 'Сайттын тексттери жана сүрөттөрү, билдирмелер, пикирлер')}
             </p>
           </div>
         </div>
@@ -350,14 +362,14 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({ lang, 
       </div>
 
       {loadError && (
-        <div className="px-5 py-2 bg-red-50 border-b border-red-200 text-xs text-red-800 flex items-center gap-2">
+        <div className="shrink-0 px-5 py-2 bg-red-50 border-b border-red-200 text-xs text-red-800 flex items-center gap-2">
           <AlertCircle className="w-4 h-4" />
           <span>{loadError}</span>
         </div>
       )}
 
       {stats?.integrations.storage === 'missing' && (
-        <div className="px-5 py-3 bg-amber-50 border-b border-amber-300 text-xs text-amber-900 flex items-start gap-2">
+        <div className="shrink-0 px-5 py-3 bg-amber-50 border-b border-amber-300 text-xs text-amber-900 flex items-start gap-2">
           <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
           <span>
             {t(
@@ -368,64 +380,26 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({ lang, 
         </div>
       )}
 
-      {/* KPI Metric Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 bg-stone-100 border-b border-stone-200">
-        {[
-          {
-            label: t('Посещений сегодня', 'Бүгүнкү кирүүлөр'),
-            value: stats?.visitsToday ?? '—',
-            sub: `${t('всего', 'бардыгы')}: ${stats?.totalVisits ?? '—'}`,
-            icon: <Users className="w-4 h-4 text-stone-400" />,
-          },
-          {
-            label: t('Новые заявки', 'Жаңы билдирмелер'),
-            value: stats?.newApplications ?? '—',
-            sub: `${t('всего', 'бардыгы')}: ${stats?.totalApplications ?? '—'}`,
-            icon: <FileCheck className="w-4 h-4 text-stone-400" />,
-          },
-          {
-            label: t('Скачиваний', 'Жүктөөлөр'),
-            value: stats?.totalDownloads ?? '—',
-            sub: t('методических материалов', 'усулдук материалдар'),
-            icon: <Download className="w-4 h-4 text-stone-400" />,
-          },
-          {
-            label: t('Вопросов ИИ-помощнику', 'ИИ-жардамчыга суроолор'),
-            value: stats?.totalChatQueries ?? '—',
-            sub: `${t('отзывов ждут', 'пикир күтүүдө')}: ${stats?.pendingReviews ?? '—'}`,
-            icon: <Bot className="w-4 h-4 text-stone-400" />,
-          },
-        ].map((card) => (
-          <div key={card.label} className="bg-white p-3.5 rounded-xl border border-stone-200 shadow-xs">
-            <div className="flex items-center justify-between text-stone-500 text-xs mb-1 gap-2">
-              <span>{card.label}</span>
-              {card.icon}
-            </div>
-            <div className="font-serif text-2xl font-bold text-stone-900">{card.value}</div>
-            <div className="text-[10px] text-stone-500 mt-0.5">{card.sub}</div>
-          </div>
-        ))}
-      </div>
-
       {/* Tab selection */}
-      <div className="px-4 sm:px-5 pt-3 border-b border-stone-200 bg-white flex gap-4 text-xs font-semibold overflow-x-auto">
+      <div className="shrink-0 px-2 sm:px-5 border-b border-stone-200 bg-white flex gap-1 sm:gap-4 text-xs sm:text-sm font-semibold overflow-x-auto">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`pb-2.5 border-b-2 whitespace-nowrap transition-colors cursor-pointer ${
+            className={`flex items-center gap-1.5 px-2 py-3 border-b-2 whitespace-nowrap transition-colors cursor-pointer ${
               activeTab === tab.id
                 ? 'border-emerald-700 text-emerald-900'
                 : 'border-transparent text-stone-500 hover:text-stone-800'
             }`}
           >
+            {tab.icon}
             {tab.label}
           </button>
         ))}
       </div>
 
       {/* Body content */}
-      <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-4">
+      <div className="p-4 sm:p-6 overflow-y-auto flex-1 min-h-0 space-y-4">
         {activeTab === 'applications' && (
           <div className="space-y-3">
             <div className="flex flex-wrap gap-1.5 text-[11px] font-semibold">
@@ -626,6 +600,43 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({ lang, 
 
         {activeTab === 'activity' && (
           <div className="space-y-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                {
+                  label: t('Посещений сегодня', 'Бүгүнкү кирүүлөр'),
+                  value: stats?.visitsToday ?? '—',
+                  sub: `${t('всего', 'бардыгы')}: ${stats?.totalVisits ?? '—'}`,
+                  icon: <Users className="w-4 h-4 text-stone-400" />,
+                },
+                {
+                  label: t('Новые заявки', 'Жаңы билдирмелер'),
+                  value: stats?.newApplications ?? '—',
+                  sub: `${t('всего', 'бардыгы')}: ${stats?.totalApplications ?? '—'}`,
+                  icon: <FileCheck className="w-4 h-4 text-stone-400" />,
+                },
+                {
+                  label: t('Скачиваний', 'Жүктөөлөр'),
+                  value: stats?.totalDownloads ?? '—',
+                  sub: t('методических материалов', 'усулдук материалдар'),
+                  icon: <Download className="w-4 h-4 text-stone-400" />,
+                },
+                {
+                  label: t('Вопросов ИИ-помощнику', 'ИИ-жардамчыга суроолор'),
+                  value: stats?.totalChatQueries ?? '—',
+                  sub: `${t('отзывов ждут', 'пикир күтүүдө')}: ${stats?.pendingReviews ?? '—'}`,
+                  icon: <Bot className="w-4 h-4 text-stone-400" />,
+                },
+              ].map((card) => (
+                <div key={card.label} className="bg-white p-3.5 rounded-xl border border-stone-200 shadow-xs">
+                  <div className="flex items-center justify-between text-stone-500 text-xs mb-1 gap-2">
+                    <span>{card.label}</span>
+                    {card.icon}
+                  </div>
+                  <div className="font-serif text-2xl font-bold text-stone-900">{card.value}</div>
+                  <div className="text-[10px] text-stone-500 mt-0.5">{card.sub}</div>
+                </div>
+              ))}
+            </div>
             <div className="bg-white rounded-xl border border-stone-200 p-4">
               <p className="text-xs font-semibold text-stone-700 mb-3">{t('Посещения за 7 дней', '7 күндүк кирүүлөр')}</p>
               <div className="flex items-end gap-2 h-28">
@@ -758,8 +769,8 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({ lang, 
               <Settings className="w-5 h-5 text-stone-500 shrink-0" />
               <p className="text-stone-600 leading-relaxed">
                 {t(
-                  'Имя, фото, контакты и все тексты сайта меняются во вкладке «Содержимое сайта». Пароль этой панели задаётся переменной ADMIN_PASSWORD в настройках Vercel.',
-                  'Аты-жөнү, сүрөт, байланыштар жана сайттын бардык тексттери «Сайттын мазмуну» өтмөгүндө өзгөртүлөт. Бул панелдин сырсөзү Vercelдеги ADMIN_PASSWORD өзгөрмөсү менен коюлат.'
+                  'Имя, фото, контакты и все тексты сайта меняются во вкладке «Тексты и фото». Пароль этой панели задаётся переменной ADMIN_PASSWORD в настройках Vercel.',
+                  'Аты-жөнү, сүрөт, байланыштар жана сайттын бардык тексттери «Тексттер жана сүрөттөр» өтмөгүндө өзгөртүлөт. Бул панелдин сырсөзү Vercelдеги ADMIN_PASSWORD өзгөрмөсү менен коюлат.'
                 )}
               </p>
             </div>
@@ -768,7 +779,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({ lang, 
       </div>
 
       {/* Footer */}
-      <div className="bg-stone-100 px-4 sm:px-6 py-3 border-t border-stone-200 flex items-center justify-between gap-3 text-xs text-stone-500">
+      <div className="hidden sm:flex shrink-0 bg-stone-100 px-4 sm:px-6 py-3 border-t border-stone-200 items-center justify-between gap-3 text-xs text-stone-500">
         <span>{t('Данные обновляются каждые 15 секунд', 'Маалымат ар 15 секунд сайын жаңыланат')}</span>
         <button
           onClick={onClose}
