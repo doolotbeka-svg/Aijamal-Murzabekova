@@ -9,6 +9,7 @@ import {
   CheckCircle,
   ImagePlus,
   Loader2,
+  Languages,
   Plus,
   RotateCcw,
   Save,
@@ -247,6 +248,8 @@ export const ContentEditor: React.FC<ContentEditorProps> = ({ lang, token, onUna
   const keys = SECTIONS.find((s) => s.id === tab)!.keys;
   const [status, setStatus] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
   const [saving, setSaving] = useState(false);
+  // Translations still running; saving waits for them so the KG texts are not lost
+  const [translating, setTranslating] = useState(0);
 
   const dirty = saved !== null && draft !== null && JSON.stringify(saved) !== JSON.stringify(draft);
 
@@ -302,6 +305,26 @@ export const ContentEditor: React.FC<ContentEditorProps> = ({ lang, token, onUna
     }
   };
 
+  const translate = async (text: string): Promise<string> => {
+    setTranslating((n) => n + 1);
+    try {
+      const res = await fetch('/api/admin/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ text }),
+      });
+      if (res.status === 401) {
+        onUnauthorized();
+        throw new Error(t('Сессия истекла', 'Сессия бүттү'));
+      }
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      return data.text;
+    } finally {
+      setTranslating((n) => n - 1);
+    }
+  };
+
   const uploadImage = async (file: File): Promise<string> => {
     const body = await prepareImage(file);
     const res = await fetch('/api/admin/upload', {
@@ -347,8 +370,8 @@ export const ContentEditor: React.FC<ContentEditorProps> = ({ lang, token, onUna
 
       <p className="text-xs text-stone-500">
         {t(
-          'Выберите раздел, измените тексты или нажмите «Загрузить фото», затем нажмите «Сохранить» внизу. У каждого текста две версии: на русском (RU) и на кыргызском (KG).',
-          'Бөлүмдү тандап, текстти өзгөртүңүз же «Сүрөт жүктөө» баскычын басыңыз, андан кийин «Сактоо». Ар бир текст эки тилде: орусча (RU) жана кыргызча (KG).'
+          'Выберите раздел, измените тексты или нажмите «Загрузить фото», затем нажмите «Сохранить» внизу. Пишите текст на русском (RU) — кыргызская версия (KG) заполнится автоматическим переводом, его стоит проверить.',
+          'Бөлүмдү тандап, текстти өзгөртүңүз же «Сүрөт жүктөө» баскычын басыңыз, андан кийин «Сактоо». Орусча (RU) жазыңыз — кыргызча (KG) автоматтык которулат, аны текшериңиз.'
         )}
       </p>
 
@@ -369,6 +392,7 @@ export const ContentEditor: React.FC<ContentEditorProps> = ({ lang, token, onUna
             section={section}
             lang={lang}
             uploadImage={uploadImage}
+            translate={translate}
           />
         </div>
       ))}
@@ -380,6 +404,11 @@ export const ContentEditor: React.FC<ContentEditorProps> = ({ lang, token, onUna
             <span className={`flex items-center gap-1.5 ${status.kind === 'ok' ? 'text-emerald-700' : 'text-red-700'}`}>
               {status.kind === 'ok' ? <CheckCircle className="w-4 h-4" /> : <AlertCircle className="w-4 h-4" />}
               {status.text}
+            </span>
+          ) : translating > 0 ? (
+            <span className="flex items-center gap-1.5 text-stone-500">
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              {t('Перевожу на кыргызский…', 'Кыргызчага которулууда…')}
             </span>
           ) : dirty ? (
             <span className="text-amber-700">{t('Есть несохранённые изменения', 'Сакталбаган өзгөрүүлөр бар')}</span>
@@ -401,7 +430,7 @@ export const ContentEditor: React.FC<ContentEditorProps> = ({ lang, token, onUna
           </button>
           <button
             onClick={save}
-            disabled={!dirty || saving}
+            disabled={!dirty || saving || translating > 0}
             className="flex items-center gap-1.5 px-5 py-2.5 text-sm font-semibold text-white bg-emerald-800 hover:bg-emerald-900 rounded-lg disabled:opacity-40 cursor-pointer"
           >
             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
@@ -420,33 +449,16 @@ interface FieldEditorProps {
   section: Section;
   lang: Language;
   uploadImage: (file: File) => Promise<string>;
+  translate: (text: string) => Promise<string>;
 }
 
-const FieldEditor: React.FC<FieldEditorProps> = ({ value, onChange, path, section, lang, uploadImage }) => {
+const FieldEditor: React.FC<FieldEditorProps> = ({ value, onChange, path, section, lang, uploadImage, translate }) => {
   const key = String([...path].reverse().find((p) => typeof p === 'string'));
   const optionKey = `${section}.${key}`;
 
   if (isLocalized(value)) {
     const long = Math.max(value.ru.length, value.kg.length) > 70 || key === 'description' || key === 'text';
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-        {(['ru', 'kg'] as const).map((l) => (
-          <label key={l} className="block">
-            <span className="text-[10px] font-bold text-stone-400">{l.toUpperCase()}</span>
-            {long ? (
-              <textarea
-                rows={3}
-                value={value[l]}
-                onChange={(e) => onChange({ ...value, [l]: e.target.value })}
-                className={inputCls}
-              />
-            ) : (
-              <input value={value[l]} onChange={(e) => onChange({ ...value, [l]: e.target.value })} className={inputCls} />
-            )}
-          </label>
-        ))}
-      </div>
-    );
+    return <LocalizedField value={value} onChange={onChange} long={long} lang={lang} translate={translate} />;
   }
 
   if (typeof value === 'string') {
@@ -535,6 +547,7 @@ const FieldEditor: React.FC<FieldEditorProps> = ({ value, onChange, path, sectio
                 section={section}
                 lang={lang}
                 uploadImage={uploadImage}
+                translate={translate}
               />
             </div>
           </details>
@@ -568,6 +581,7 @@ const FieldEditor: React.FC<FieldEditorProps> = ({ value, onChange, path, sectio
                 section={section}
                 lang={lang}
                 uploadImage={uploadImage}
+                translate={translate}
               />
             </div>
           ))}
@@ -576,6 +590,97 @@ const FieldEditor: React.FC<FieldEditorProps> = ({ value, onChange, path, sectio
   }
 
   return null;
+};
+
+/**
+ * A text in Russian and Kyrgyz. When the Russian text is changed, the Kyrgyz one is filled in
+ * by machine translation, unless the teacher has edited the Kyrgyz text by hand.
+ */
+const LocalizedField: React.FC<{
+  value: { ru: string; kg: string };
+  onChange: (value: Json) => void;
+  long: boolean;
+  lang: Language;
+  translate: (text: string) => Promise<string>;
+}> = ({ value, onChange, long, lang, translate }) => {
+  const t = (ru: string, kg: string) => (lang === 'ru' ? ru : kg);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<{ kind: 'auto' | 'error'; text: string } | null>(null);
+  // Set once the Kyrgyz text is typed by hand: automatic translation then stops overwriting it
+  const [kgEdited, setKgEdited] = useState(false);
+  const ruOnFocus = useRef(value.ru);
+  // The translation arrives later; apply it to the latest value and handler, not to stale ones
+  const latest = useRef({ value, onChange });
+  latest.current = { value, onChange };
+  const mounted = useRef(true);
+  useEffect(() => () => void (mounted.current = false), []);
+
+  const runTranslation = async () => {
+    const ru = latest.current.value.ru.trim();
+    if (!ru || busy) return;
+    setBusy(true);
+    setNote(null);
+    try {
+      const kg = await translate(ru);
+      if (!mounted.current) return;
+      latest.current.onChange({ ...latest.current.value, kg });
+      setKgEdited(false);
+      setNote({ kind: 'auto', text: t('Переведено автоматически — проверьте текст', 'Автоматтык которулду — текшериңиз') });
+    } catch (e: any) {
+      if (mounted.current) setNote({ kind: 'error', text: `${t('Не удалось перевести', 'Которулган жок')}: ${e.message}` });
+    } finally {
+      if (mounted.current) setBusy(false);
+    }
+  };
+
+  const field = (l: 'ru' | 'kg') => {
+    const props = {
+      value: value[l],
+      className: inputCls,
+      onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+        if (l === 'kg') {
+          setKgEdited(true);
+          setNote(null);
+        }
+        onChange({ ...value, [l]: e.target.value });
+      },
+      ...(l === 'ru' && {
+        onFocus: () => (ruOnFocus.current = value.ru),
+        onBlur: () => {
+          if (value.ru !== ruOnFocus.current && !kgEdited) runTranslation();
+        },
+      }),
+    };
+    return long ? <textarea rows={3} {...props} /> : <input {...props} />;
+  };
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+      <label className="block">
+        <span className="flex items-center h-5 text-[10px] font-bold text-stone-400">RU</span>
+        {field('ru')}
+      </label>
+      <div>
+        <div className="flex items-center justify-between gap-2 h-5">
+          <span className="text-[10px] font-bold text-stone-400">KG</span>
+          <button
+            type="button"
+            onClick={runTranslation}
+            disabled={busy || !value.ru.trim()}
+            title={t('Перевести русский текст на кыргызский', 'Орусча текстти кыргызчага которуу')}
+            className="flex items-center gap-1 text-[10px] font-semibold text-emerald-700 hover:text-emerald-900 disabled:opacity-40 cursor-pointer"
+          >
+            {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Languages className="w-3 h-3" />}
+            {t('Перевести с русского', 'Орусчадан которуу')}
+          </button>
+        </div>
+        {field('kg')}
+        {note && (
+          <p className={`text-[10px] mt-0.5 ${note.kind === 'error' ? 'text-red-700' : 'text-amber-700'}`}>{note.text}</p>
+        )}
+      </div>
+    </div>
+  );
 };
 
 const IconButton: React.FC<{

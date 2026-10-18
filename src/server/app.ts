@@ -615,6 +615,38 @@ export function createApiApp() {
     })
   );
 
+  // Russian → Kyrgyz translation for the content editor
+  admin.post(
+    '/translate',
+    rateLimit('translate', 300, 10 * 60 * 1000),
+    handle(async (req, res) => {
+      const text = clean(req.body?.text, 4000);
+      if (!text) {
+        res.json({ text: '' });
+        return;
+      }
+      if (!ai) {
+        res.status(503).json({ error: 'Автоперевод недоступен: на сервере не задан GEMINI_API_KEY' });
+        return;
+      }
+      const response = await ai.models.generateContent({
+        model: GEMINI_MODEL,
+        contents: [{ role: 'user', parts: [{ text }] }],
+        config: {
+          systemInstruction:
+            'Переведи текст пользователя с русского на кыргызский язык для сайта учительницы начальных классов из г. Ош. ' +
+            'Верни только перевод, без пояснений и кавычек вокруг ответа. Сохрани имена, числа, даты, телефоны, ссылки, ' +
+            'эмодзи, кавычки внутри текста и переносы строк. Если текст уже на кыргызском, верни его без изменений.',
+          temperature: 0.2,
+          abortSignal: AbortSignal.timeout(20000),
+        },
+      });
+      const translated = response.text?.trim();
+      if (!translated) throw new Error('Пустой ответ переводчика');
+      res.json({ text: translated });
+    })
+  );
+
   admin.post(
     '/telegram-test',
     handle(async (_req, res) => {
