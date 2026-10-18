@@ -305,13 +305,13 @@ export const ContentEditor: React.FC<ContentEditorProps> = ({ lang, token, onUna
     }
   };
 
-  const translate = async (text: string): Promise<string> => {
+  const translate = async (text: string, from: 'ru' | 'kg'): Promise<string> => {
     setTranslating((n) => n + 1);
     try {
       const res = await fetch('/api/admin/translate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, from }),
       });
       if (res.status === 401) {
         onUnauthorized();
@@ -370,8 +370,8 @@ export const ContentEditor: React.FC<ContentEditorProps> = ({ lang, token, onUna
 
       <p className="text-xs text-stone-500">
         {t(
-          'Выберите раздел, измените тексты или нажмите «Загрузить фото», затем нажмите «Сохранить» внизу. Пишите текст на русском (RU) — кыргызская версия (KG) заполнится автоматическим переводом, его стоит проверить.',
-          'Бөлүмдү тандап, текстти өзгөртүңүз же «Сүрөт жүктөө» баскычын басыңыз, андан кийин «Сактоо». Орусча (RU) жазыңыз — кыргызча (KG) автоматтык которулат, аны текшериңиз.'
+          'Выберите раздел, измените тексты или нажмите «Загрузить фото», затем нажмите «Сохранить» внизу. Пишите текст на одном языке — вторая версия (RU или KG) заполнится автоматическим переводом, его стоит проверить.',
+          'Бөлүмдү тандап, текстти өзгөртүңүз же «Сүрөт жүктөө» баскычын басыңыз, андан кийин «Сактоо». Бир тилде жазыңыз — экинчи тил (RU же KG) автоматтык которулат, аны текшериңиз.'
         )}
       </p>
 
@@ -408,7 +408,7 @@ export const ContentEditor: React.FC<ContentEditorProps> = ({ lang, token, onUna
           ) : translating > 0 ? (
             <span className="flex items-center gap-1.5 text-stone-500">
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              {t('Перевожу на кыргызский…', 'Кыргызчага которулууда…')}
+              {t('Перевожу…', 'Которулууда…')}
             </span>
           ) : dirty ? (
             <span className="text-amber-700">{t('Есть несохранённые изменения', 'Сакталбаган өзгөрүүлөр бар')}</span>
@@ -449,7 +449,7 @@ interface FieldEditorProps {
   section: Section;
   lang: Language;
   uploadImage: (file: File) => Promise<string>;
-  translate: (text: string) => Promise<string>;
+  translate: (text: string, from: 'ru' | 'kg') => Promise<string>;
 }
 
 const FieldEditor: React.FC<FieldEditorProps> = ({ value, onChange, path, section, lang, uploadImage, translate }) => {
@@ -592,93 +592,101 @@ const FieldEditor: React.FC<FieldEditorProps> = ({ value, onChange, path, sectio
   return null;
 };
 
+type Lang2 = 'ru' | 'kg';
+const OTHER: Record<Lang2, Lang2> = { ru: 'kg', kg: 'ru' };
+
 /**
- * A text in Russian and Kyrgyz. When the Russian text is changed, the Kyrgyz one is filled in
- * by machine translation, unless the teacher has edited the Kyrgyz text by hand.
+ * A text in Russian and Kyrgyz. When one language is changed, the other is filled in by machine
+ * translation, unless the teacher has typed that other text by hand.
  */
 const LocalizedField: React.FC<{
   value: { ru: string; kg: string };
   onChange: (value: Json) => void;
   long: boolean;
   lang: Language;
-  translate: (text: string) => Promise<string>;
+  translate: (text: string, from: Lang2) => Promise<string>;
 }> = ({ value, onChange, long, lang, translate }) => {
   const t = (ru: string, kg: string) => (lang === 'ru' ? ru : kg);
-  const [busy, setBusy] = useState(false);
-  const [note, setNote] = useState<{ kind: 'auto' | 'error'; text: string } | null>(null);
-  // Set once the Kyrgyz text is typed by hand: automatic translation then stops overwriting it
-  const [kgEdited, setKgEdited] = useState(false);
-  const ruOnFocus = useRef(value.ru);
+  // Which side is being translated into
+  const [busy, setBusy] = useState<Lang2 | null>(null);
+  const [note, setNote] = useState<{ side: Lang2; kind: 'auto' | 'error'; text: string } | null>(null);
+  // Sides typed by hand; automatic translation never overwrites them
+  const [typed, setTyped] = useState<Record<Lang2, boolean>>({ ru: false, kg: false });
+  const onFocusValue = useRef(value);
   // The translation arrives later; apply it to the latest value and handler, not to stale ones
   const latest = useRef({ value, onChange });
   latest.current = { value, onChange };
   const mounted = useRef(true);
   useEffect(() => () => void (mounted.current = false), []);
 
-  const runTranslation = async () => {
-    const ru = latest.current.value.ru.trim();
-    if (!ru || busy) return;
-    setBusy(true);
+  const runTranslation = async (from: Lang2) => {
+    const to = OTHER[from];
+    const source = latest.current.value[from].trim();
+    if (!source || busy) return;
+    setBusy(to);
     setNote(null);
     try {
-      const kg = await translate(ru);
+      const result = await translate(source, from);
       if (!mounted.current) return;
-      latest.current.onChange({ ...latest.current.value, kg });
-      setKgEdited(false);
-      setNote({ kind: 'auto', text: t('Переведено автоматически — проверьте текст', 'Автоматтык которулду — текшериңиз') });
+      latest.current.onChange({ ...latest.current.value, [to]: result });
+      setTyped((prev) => ({ ...prev, [to]: false }));
+      setNote({ side: to, kind: 'auto', text: t('Переведено автоматически — проверьте текст', 'Автоматтык которулду — текшериңиз') });
     } catch (e: any) {
-      if (mounted.current) setNote({ kind: 'error', text: `${t('Не удалось перевести', 'Которулган жок')}: ${e.message}` });
+      if (mounted.current) {
+        setNote({ side: to, kind: 'error', text: `${t('Не удалось перевести', 'Которулган жок')}: ${e.message}` });
+      }
     } finally {
-      if (mounted.current) setBusy(false);
+      if (mounted.current) setBusy(null);
     }
   };
 
-  const field = (l: 'ru' | 'kg') => {
+  const field = (l: Lang2) => {
     const props = {
       value: value[l],
       className: inputCls,
+      onFocus: () => (onFocusValue.current = value),
       onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-        if (l === 'kg') {
-          setKgEdited(true);
-          setNote(null);
-        }
+        setTyped((prev) => (prev[l] ? prev : { ...prev, [l]: true }));
+        if (note?.side === l) setNote(null);
         onChange({ ...value, [l]: e.target.value });
       },
-      ...(l === 'ru' && {
-        onFocus: () => (ruOnFocus.current = value.ru),
-        onBlur: () => {
-          if (value.ru !== ruOnFocus.current && !kgEdited) runTranslation();
-        },
-      }),
+      onBlur: () => {
+        if (value[l] !== onFocusValue.current[l] && !typed[OTHER[l]]) runTranslation(l);
+      },
     };
     return long ? <textarea rows={3} {...props} /> : <input {...props} />;
   };
 
+  const column = (l: Lang2) => (
+    <div>
+      <div className="flex items-center justify-between gap-2 h-5">
+        <span className="text-[10px] font-bold text-stone-400">{l.toUpperCase()}</span>
+        <button
+          type="button"
+          onClick={() => runTranslation(OTHER[l])}
+          disabled={busy !== null || !value[OTHER[l]].trim()}
+          title={
+            l === 'kg'
+              ? t('Перевести русский текст на кыргызский', 'Орусча текстти кыргызчага которуу')
+              : t('Перевести кыргызский текст на русский', 'Кыргызча текстти орусчага которуу')
+          }
+          className="flex items-center gap-1 text-[10px] font-semibold text-emerald-700 hover:text-emerald-900 disabled:opacity-40 cursor-pointer"
+        >
+          {busy === l ? <Loader2 className="w-3 h-3 animate-spin" /> : <Languages className="w-3 h-3" />}
+          {l === 'kg' ? t('Перевести с русского', 'Орусчадан которуу') : t('Перевести с кыргызского', 'Кыргызчадан которуу')}
+        </button>
+      </div>
+      {field(l)}
+      {note?.side === l && (
+        <p className={`text-[10px] mt-0.5 ${note.kind === 'error' ? 'text-red-700' : 'text-amber-700'}`}>{note.text}</p>
+      )}
+    </div>
+  );
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-      <label className="block">
-        <span className="flex items-center h-5 text-[10px] font-bold text-stone-400">RU</span>
-        {field('ru')}
-      </label>
-      <div>
-        <div className="flex items-center justify-between gap-2 h-5">
-          <span className="text-[10px] font-bold text-stone-400">KG</span>
-          <button
-            type="button"
-            onClick={runTranslation}
-            disabled={busy || !value.ru.trim()}
-            title={t('Перевести русский текст на кыргызский', 'Орусча текстти кыргызчага которуу')}
-            className="flex items-center gap-1 text-[10px] font-semibold text-emerald-700 hover:text-emerald-900 disabled:opacity-40 cursor-pointer"
-          >
-            {busy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Languages className="w-3 h-3" />}
-            {t('Перевести с русского', 'Орусчадан которуу')}
-          </button>
-        </div>
-        {field('kg')}
-        {note && (
-          <p className={`text-[10px] mt-0.5 ${note.kind === 'error' ? 'text-red-700' : 'text-amber-700'}`}>{note.text}</p>
-        )}
-      </div>
+      {column('ru')}
+      {column('kg')}
     </div>
   );
 };
