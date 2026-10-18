@@ -25,13 +25,20 @@ interface ContentEditorProps {
 
 type Section = keyof SiteContent;
 
-const SECTIONS: { id: Section; ru: string; kg: string }[] = [
-  { id: 'teacherProfile', ru: 'Фото и профиль', kg: 'Сүрөт жана профиль' },
-  { id: 'galleryItems', ru: 'Галерея (фото)', kg: 'Галерея (сүрөттөр)' },
-  { id: 'schoolContactDetails', ru: 'Контакты', kg: 'Байланыш' },
-  { id: 'achievementsList', ru: 'Достижения', kg: 'Сыйлыктар' },
-  { id: 'methodologicalMaterials', ru: 'Методические материалы', kg: 'Усулдук материалдар' },
+// A tab of the editor can show several parts of the content, each in its own block
+const SECTIONS: { id: string; ru: string; kg: string; keys: Section[] }[] = [
+  { id: 'profile', ru: 'Фото и профиль', kg: 'Сүрөт жана профиль', keys: ['teacherProfile'] },
+  { id: 'gallery', ru: 'Галерея (фото)', kg: 'Галерея (сүрөттөр)', keys: ['galleryItems'] },
+  { id: 'contacts', ru: 'Контакты', kg: 'Байланыш', keys: ['schoolContactDetails'] },
+  { id: 'achievements', ru: 'Достижения', kg: 'Сыйлыктар', keys: ['achievementsSection', 'achievementsList'] },
+  { id: 'materials', ru: 'Методические материалы', kg: 'Усулдук материалдар', keys: ['methodologicalMaterials'] },
 ];
+
+// Block headings, shown when a tab has more than one block
+const BLOCK_TITLES: Partial<Record<Section, { ru: string; kg: string }>> = {
+  achievementsSection: { ru: 'Заголовки, вкладки и надписи раздела', kg: 'Бөлүмдүн аталыштары жана жазуулары' },
+  achievementsList: { ru: 'Награды и победы (фото и тексты)', kg: 'Сыйлыктар жана жеңиштер' },
+};
 
 // Technical fields that are kept as-is but not shown in the editor
 const HIDDEN_KEYS = new Set(['id', 'icon', 'fileType', 'fileSize', 'downloadCount']);
@@ -87,6 +94,29 @@ const LABELS: Record<string, string> = {
   badge: 'Значок',
   imageUrl: 'Фото',
   date: 'Дата',
+  subtitle: 'Подзаголовок',
+  tabAll: 'Вкладка «все»',
+  tabTeacher: 'Вкладка наград учителя',
+  tabStudents: 'Вкладка успехов учеников',
+  yearSuffix: 'Сокращение после года',
+  cardNote: 'Подпись внизу карточки',
+  certificateButton: 'Кнопка на карточке',
+  modalYearLabel: 'Окно сертификата: подпись года',
+  modalRegionLabel: 'Окно сертификата: подпись региона',
+  modalRegion: 'Окно сертификата: регион',
+  modalStatusLabel: 'Окно сертификата: подпись статуса',
+  modalStatus: 'Окно сертификата: статус',
+  modalCloseButton: 'Окно сертификата: кнопка закрытия',
+};
+
+// Labels that depend on the section; the key is "<section>.<field>"
+const SECTION_LABELS: Record<string, string> = {
+  'achievementsSection.badge': 'Надпись над заголовком',
+  'achievementsSection.title': 'Заголовок раздела',
+  'achievementsList.title': 'Название награды',
+  'achievementsList.badge': 'Метка на карточке',
+  'galleryItems.title': 'Название',
+  'methodologicalMaterials.title': 'Название',
 };
 
 // Fixed choices; the key is "<section>.<field>"
@@ -213,7 +243,8 @@ export const ContentEditor: React.FC<ContentEditorProps> = ({ lang, token, onUna
 
   const [saved, setSaved] = useState<SiteContent | null>(null);
   const [draft, setDraft] = useState<SiteContent | null>(null);
-  const [section, setSection] = useState<Section>('teacherProfile');
+  const [tab, setTab] = useState(SECTIONS[0].id);
+  const keys = SECTIONS.find((s) => s.id === tab)!.keys;
   const [status, setStatus] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -295,7 +326,6 @@ export const ContentEditor: React.FC<ContentEditorProps> = ({ lang, token, onUna
     );
   }
 
-  const updateSection = (value: Json) => setDraft({ ...draft, [section]: value } as SiteContent);
 
   return (
     <div className="space-y-4">
@@ -303,9 +333,9 @@ export const ContentEditor: React.FC<ContentEditorProps> = ({ lang, token, onUna
         {SECTIONS.map((s) => (
           <button
             key={s.id}
-            onClick={() => setSection(s.id)}
+            onClick={() => setTab(s.id)}
             className={`shrink-0 px-3 py-1.5 rounded-full border cursor-pointer ${
-              section === s.id
+              tab === s.id
                 ? 'bg-emerald-800 text-white border-emerald-800'
                 : 'bg-white text-stone-600 border-stone-200 hover:bg-stone-100'
             }`}
@@ -322,21 +352,26 @@ export const ContentEditor: React.FC<ContentEditorProps> = ({ lang, token, onUna
         )}
       </p>
 
-      <div className="bg-white p-4 sm:p-5 rounded-xl border border-stone-200 space-y-4">
-        {Array.isArray(draft[section]) && (
-          <p className="text-xs text-stone-500">
-            {t('Нажмите на пункт, чтобы открыть его и изменить текст или фото.', 'Өзгөртүү үчүн пунктту басыңыз.')}
-          </p>
-        )}
-        <FieldEditor
-          value={draft[section] as unknown as Json}
-          onChange={updateSection}
-          path={[section]}
-          section={section}
-          lang={lang}
-          uploadImage={uploadImage}
-        />
-      </div>
+      {keys.map((section) => (
+        <div key={section} className="bg-white p-4 sm:p-5 rounded-xl border border-stone-200 space-y-4">
+          {keys.length > 1 && BLOCK_TITLES[section] && (
+            <h4 className="font-serif text-base font-bold text-stone-900">{BLOCK_TITLES[section]![lang]}</h4>
+          )}
+          {Array.isArray(draft[section]) && (
+            <p className="text-xs text-stone-500">
+              {t('Нажмите на пункт, чтобы открыть его и изменить текст или фото.', 'Өзгөртүү үчүн пунктту басыңыз.')}
+            </p>
+          )}
+          <FieldEditor
+            value={draft[section] as unknown as Json}
+            onChange={(value) => setDraft({ ...draft, [section]: value } as SiteContent)}
+            path={[section]}
+            section={section}
+            lang={lang}
+            uploadImage={uploadImage}
+          />
+        </div>
+      ))}
 
       {/* Sticky save bar */}
       <div className="sticky -bottom-4 sm:-bottom-6 -mx-4 sm:-mx-6 -mb-4 sm:-mb-6 px-4 sm:px-6 py-3 bg-white/95 backdrop-blur border-t border-stone-200 shadow-[0_-4px_12px_rgba(0,0,0,0.04)] flex flex-wrap items-center justify-between gap-2">
@@ -525,7 +560,7 @@ const FieldEditor: React.FC<FieldEditorProps> = ({ value, onChange, path, sectio
           .sort(([a], [b]) => Number(IMAGE_KEYS.has(b)) - Number(IMAGE_KEYS.has(a)))
           .map(([k, v]) => (
             <div key={k}>
-              <div className="text-xs font-semibold text-stone-700 mb-1">{LABELS[k] || k}</div>
+              <div className="text-xs font-semibold text-stone-700 mb-1">{SECTION_LABELS[`${section}.${k}`] || LABELS[k] || k}</div>
               <FieldEditor
                 value={v}
                 onChange={(nv) => onChange({ ...value, [k]: nv })}

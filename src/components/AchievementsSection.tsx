@@ -19,7 +19,7 @@ interface AchievementsSectionProps {
 }
 
 export const AchievementsSection: React.FC<AchievementsSectionProps> = ({ lang }) => {
-  const { achievementsList } = useContent();
+  const { achievementsList, achievementsSection: texts } = useContent();
   const [activeTab, setActiveTab] = useState<'all' | 'teacher' | 'students'>('all');
   const [selectedAward, setSelectedAward] = useState<Achievement | null>(null);
 
@@ -34,15 +34,13 @@ export const AchievementsSection: React.FC<AchievementsSectionProps> = ({ lang }
         {/* Header */}
         <div className="text-center max-w-3xl mx-auto mb-12">
           <span className="text-xs font-bold uppercase tracking-wider text-emerald-800 bg-emerald-100 px-3 py-1 rounded-full">
-            {lang === 'ru' ? 'Признание и результаты' : 'Таануу жана натыйжалар'}
+            {texts.badge[lang]}
           </span>
           <h2 className="font-serif text-3xl sm:text-4xl font-bold text-stone-900 mt-3 mb-4">
-            {lang === 'ru' ? 'Достижения, государственные награды и победы' : 'Мамлекеттик сыйлыктар жана окуучулардын жеңиштери'}
+            {texts.title[lang]}
           </h2>
           <p className="text-stone-600 text-base leading-relaxed">
-            {lang === 'ru'
-              ? 'Официальные награды Министерства образования и науки КР, мэрии г. Ош и триумфы наших учеников на городских олимпиадах.'
-              : 'КР Билим берүү жана илим министрлигинин, Ош шаарынын мэриясынын сыйлыктары жана окуучуларыбыздын шаардык олимпиадалардагы жеңиштери.'}
+            {texts.subtitle[lang]}
           </p>
         </div>
 
@@ -57,7 +55,7 @@ export const AchievementsSection: React.FC<AchievementsSectionProps> = ({ lang }
                   : 'text-stone-600 hover:text-stone-900'
               }`}
             >
-              {lang === 'ru' ? 'Все награды' : 'Бардык сыйлыктар'}
+              {texts.tabAll[lang]}
             </button>
             <button
               onClick={() => setActiveTab('teacher')}
@@ -68,7 +66,7 @@ export const AchievementsSection: React.FC<AchievementsSectionProps> = ({ lang }
               }`}
             >
               <Award className="w-4 h-4 text-emerald-700" />
-              <span>{lang === 'ru' ? 'Награды учителя' : 'Мугалимдин сыйлыктары'}</span>
+              <span>{texts.tabTeacher[lang]}</span>
             </button>
             <button
               onClick={() => setActiveTab('students')}
@@ -79,7 +77,7 @@ export const AchievementsSection: React.FC<AchievementsSectionProps> = ({ lang }
               }`}
             >
               <Trophy className="w-4 h-4 text-amber-600" />
-              <span>{lang === 'ru' ? 'Успехи учеников' : 'Окуучулардын жеңиштери'}</span>
+              <span>{texts.tabStudents[lang]}</span>
             </button>
           </div>
         </div>
@@ -124,7 +122,7 @@ export const AchievementsSection: React.FC<AchievementsSectionProps> = ({ lang }
                       )}
                     </div>
                     <span className="text-xs font-bold px-2.5 py-1 bg-stone-100 text-stone-700 rounded-md">
-                      {item.year} г.
+                      {item.year} {texts.yearSuffix[lang]}
                     </span>
                   </div>
 
@@ -154,14 +152,14 @@ export const AchievementsSection: React.FC<AchievementsSectionProps> = ({ lang }
 
                 <div className="pt-3 border-t border-stone-100 flex items-center justify-between">
                   <span className="text-xs text-stone-400 font-medium">
-                    {lang === 'ru' ? 'Документ верифицирован' : 'Документ тастыкталган'}
+                    {texts.cardNote[lang]}
                   </span>
                   <button
                     onClick={() => setSelectedAward(item)}
                     className="flex items-center gap-1.5 text-xs font-semibold text-emerald-800 hover:text-emerald-900 py-1.5 px-2.5 rounded-lg hover:bg-emerald-50 transition-colors cursor-pointer"
                   >
                     <Eye className="w-3.5 h-3.5" />
-                    <span>{lang === 'ru' ? 'Сертификат' : 'Күбөлүк'}</span>
+                    <span>{texts.certificateButton[lang]}</span>
                   </button>
                 </div>
               </div>
@@ -213,23 +211,23 @@ export const AchievementsSection: React.FC<AchievementsSectionProps> = ({ lang }
               <div className="bg-white p-4 rounded-xl border border-stone-200 flex items-center justify-between text-xs text-stone-600 font-medium max-w-md mx-auto mb-6">
                 <div>
                   <span className="block text-stone-400 text-[10px] uppercase">
-                    {lang === 'ru' ? 'Год вручения' : 'Берилген жылы'}
+                    {texts.modalYearLabel[lang]}
                   </span>
-                  <span className="font-bold text-stone-900">{selectedAward.year} г.</span>
+                  <span className="font-bold text-stone-900">{selectedAward.year} {texts.yearSuffix[lang]}</span>
                 </div>
                 <div>
                   <span className="block text-stone-400 text-[10px] uppercase">
-                    {lang === 'ru' ? 'Регион' : 'Аймак'}
+                    {texts.modalRegionLabel[lang]}
                   </span>
-                  <span className="font-bold text-stone-900">г. Ош, Кыргызстан</span>
+                  <span className="font-bold text-stone-900">{texts.modalRegion[lang]}</span>
                 </div>
                 <div>
                   <span className="block text-stone-400 text-[10px] uppercase">
-                    {lang === 'ru' ? 'Статус' : 'Статусу'}
+                    {texts.modalStatusLabel[lang]}
                   </span>
                   <span className="font-bold text-emerald-700 flex items-center gap-1">
                     <ShieldCheck className="w-3.5 h-3.5" />
-                    Оригинал
+                    {texts.modalStatus[lang]}
                   </span>
                 </div>
               </div>
@@ -238,7 +236,7 @@ export const AchievementsSection: React.FC<AchievementsSectionProps> = ({ lang }
                 onClick={() => setSelectedAward(null)}
                 className="px-6 py-2.5 text-xs font-semibold text-white bg-stone-900 hover:bg-stone-800 rounded-xl transition-colors cursor-pointer"
               >
-                {lang === 'ru' ? 'Закрыть сертификат' : 'Жабуу'}
+                {texts.modalCloseButton[lang]}
               </button>
             </div>
           </div>
