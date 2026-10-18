@@ -643,6 +643,31 @@ export const schoolContactDetails = {
   },
 };
 
+// Headings, buttons and captions of the achievements section
+export const achievementsSection = {
+  badge: { ru: 'Признание и результаты', kg: 'Таануу жана натыйжалар' },
+  title: {
+    ru: 'Достижения, государственные награды и победы',
+    kg: 'Мамлекеттик сыйлыктар жана окуучулардын жеңиштери',
+  },
+  subtitle: {
+    ru: 'Официальные награды Министерства образования и науки КР, мэрии г. Ош и триумфы наших учеников на городских олимпиадах.',
+    kg: 'КР Билим берүү жана илим министрлигинин, Ош шаарынын мэриясынын сыйлыктары жана окуучуларыбыздын шаардык олимпиадалардагы жеңиштери.',
+  },
+  tabAll: { ru: 'Все награды', kg: 'Бардык сыйлыктар' },
+  tabTeacher: { ru: 'Награды учителя', kg: 'Мугалимдин сыйлыктары' },
+  tabStudents: { ru: 'Успехи учеников', kg: 'Окуучулардын жеңиштери' },
+  yearSuffix: { ru: 'г.', kg: '-ж.' },
+  cardNote: { ru: 'Документ верифицирован', kg: 'Документ тастыкталган' },
+  certificateButton: { ru: 'Сертификат', kg: 'Күбөлүк' },
+  modalYearLabel: { ru: 'Год вручения', kg: 'Берилген жылы' },
+  modalRegionLabel: { ru: 'Регион', kg: 'Аймак' },
+  modalRegion: { ru: 'г. Ош, Кыргызстан', kg: 'Ош ш., Кыргызстан' },
+  modalStatusLabel: { ru: 'Статус', kg: 'Статусу' },
+  modalStatus: { ru: 'Оригинал', kg: 'Түп нуска' },
+  modalCloseButton: { ru: 'Закрыть сертификат', kg: 'Жабуу' },
+};
+
 /**
  * Default site content. The live version is edited in the admin panel and stored on the server;
  * these values are used until the first save and to fill fields added in later code versions.
@@ -652,6 +677,7 @@ export const defaultContent = {
   schoolContactDetails,
   methodologicalMaterials,
   achievementsList,
+  achievementsSection,
   galleryItems,
 };
 
