@@ -66,7 +66,7 @@ const LABELS: Record<string, string> = {
   education: 'Образование',
   institution: 'Учебное заведение',
   degree: 'Степень / специальность',
-  qualifications: 'Повышение квалификации',
+  qualifications: 'Повышение квалификации и сертификаты (фото сертификата и описание видны посетителям)',
   issuer: 'Кем выдано',
   year: 'Год',
   approachPillars: 'Принципы работы',
@@ -110,8 +110,11 @@ const LABELS: Record<string, string> = {
   modalCloseButton: 'Окно сертификата: кнопка закрытия',
 };
 
-// Labels that depend on the section; the key is "<section>.<field>"
+// Labels that depend on where a field is; the key is "<section or list>.<field>"
 const SECTION_LABELS: Record<string, string> = {
+  'qualifications.title': 'Название курса или сертификата',
+  'qualifications.imageUrl': 'Фото или скан сертификата',
+  'qualifications.description': 'Описание (видно посетителям в окне сертификата)',
   'achievementsSection.badge': 'Надпись над заголовком',
   'achievementsSection.title': 'Заголовок раздела',
   'achievementsList.title': 'Название награды',
@@ -573,7 +576,7 @@ const FieldEditor: React.FC<FieldEditorProps> = ({ value, onChange, path, sectio
           .sort(([a], [b]) => Number(IMAGE_KEYS.has(b)) - Number(IMAGE_KEYS.has(a)))
           .map(([k, v]) => (
             <div key={k}>
-              <div className="text-xs font-semibold text-stone-700 mb-1">{SECTION_LABELS[`${section}.${k}`] || LABELS[k] || k}</div>
+              <div className="text-xs font-semibold text-stone-700 mb-1">{SECTION_LABELS[`${key}.${k}`] || SECTION_LABELS[`${section}.${k}`] || LABELS[k] || k}</div>
               <FieldEditor
                 value={v}
                 onChange={(nv) => onChange({ ...value, [k]: nv })}
