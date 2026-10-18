@@ -97,6 +97,9 @@ export const teacherProfile = {
         kg: 'Эл аралык билим берүү тренинги, Бишкек — Ош (72 с.)',
       },
       year: '2023',
+      // Photo or scan of the certificate and a description, shown to visitors in a window
+      imageUrl: '',
+      description: { ru: '', kg: '' },
     },
     {
       title: {
@@ -108,6 +111,8 @@ export const teacherProfile = {
         kg: 'КР Билим берүү жана илим министрлиги, USAID (Тренер-насаатчы)',
       },
       year: '2022',
+      imageUrl: '',
+      description: { ru: '', kg: '' },
     },
     {
       title: {
@@ -119,6 +124,8 @@ export const teacherProfile = {
         kg: 'ОшМУнун алдындагы Мугалимдердин квалификациясын жогорулатуу институту',
       },
       year: '2024',
+      imageUrl: '',
+      description: { ru: '', kg: '' },
     },
     {
       title: {
@@ -130,6 +137,8 @@ export const teacherProfile = {
         kg: 'Республикалык педагогикалык кызматкерлердин квалификациясын жогорулатуу институту',
       },
       year: '2023',
+      imageUrl: '',
+      description: { ru: '', kg: '' },
     },
   ],
 
