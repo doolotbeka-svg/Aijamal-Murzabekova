@@ -193,6 +193,49 @@ async function sendTelegram(text: string): Promise<'sent' | 'failed' | 'disabled
 }
 
 // ---------------------------------------------------------------------------
+// WhatsApp notifications through CallMeBot (free, for messages to your own number).
+// The teacher enters her number and API key in the admin panel; they are kept in private storage.
+// ---------------------------------------------------------------------------
+
+const SETTINGS_PATH = 'settings.json';
+
+interface WhatsAppSettings {
+  phone: string;
+  apiKey: string;
+}
+
+async function loadWhatsApp(): Promise<WhatsAppSettings | null> {
+  const settings = await readJson<{ whatsapp?: WhatsAppSettings }>(SETTINGS_PATH).catch(() => null);
+  const wa = settings?.whatsapp;
+  return wa?.phone && wa?.apiKey ? wa : null;
+}
+
+async function sendWhatsApp(text: string, settings?: WhatsAppSettings | null): Promise<'sent' | 'failed' | 'disabled'> {
+  const wa = settings === undefined ? await loadWhatsApp() : settings;
+  if (!wa) return 'disabled';
+  try {
+    const url =
+      'https://api.callmebot.com/whatsapp.php?' +
+      new URLSearchParams({ phone: wa.phone, text, apikey: wa.apiKey }).toString();
+    const res = await fetch(url, { signal: AbortSignal.timeout(10000) });
+    // CallMeBot answers 200 with an HTML page; errors are described in its visible text
+    const page = (await res.text())
+      .replace(/<(script|style)[\s\S]*?<\/\1>/gi, ' ')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (!res.ok || /invalid|error|not allowed|blocked/i.test(page)) {
+      console.error('CallMeBot error:', res.status, page.slice(0, 300));
+      return 'failed';
+    }
+    return 'sent';
+  } catch (err) {
+    console.error('CallMeBot request failed:', err);
+    return 'failed';
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Pedagogical AI assistant (Gemini)
 // ---------------------------------------------------------------------------
 
@@ -369,25 +412,22 @@ export function createApiApp() {
         createdAt: new Date().toISOString(),
         status: 'new',
         adminNote: '',
-        notification: { telegram: 'disabled', at: '' },
+        notification: { telegram: 'disabled', whatsapp: 'disabled', at: '' },
       };
 
-      record.notification = {
-        telegram: await sendTelegram(
-          [
-            '📝 Новая заявка с сайта',
-            `Имя: ${record.name}`,
-            `Телефон: ${record.phone}`,
-            `Цель: ${record.purpose}`,
-            record.studentAgeOrGrade && `Ребёнок: ${record.studentAgeOrGrade}`,
-            `Удобная связь: ${record.preferredMessenger}`,
-            record.comment && `Комментарий: ${record.comment}`,
-          ]
-            .filter(Boolean)
-            .join('\n')
-        ),
-        at: new Date().toISOString(),
-      };
+      const message = [
+        '📝 Новая заявка с сайта',
+        `Имя: ${record.name}`,
+        `Телефон: ${record.phone}`,
+        `Цель: ${record.purpose}`,
+        record.studentAgeOrGrade && `Ребёнок: ${record.studentAgeOrGrade}`,
+        `Удобная связь: ${record.preferredMessenger}`,
+        record.comment && `Комментарий: ${record.comment}`,
+      ]
+        .filter(Boolean)
+        .join('\n');
+      const [telegram, whatsapp] = await Promise.all([sendTelegram(message), sendWhatsApp(message)]);
+      record.notification = { telegram, whatsapp, at: new Date().toISOString() };
 
       const db = await loadDb();
       db.applications.unshift(record);
@@ -429,7 +469,8 @@ export function createApiApp() {
       db.reviews.unshift(review);
       logActivity(db, 'review', 'Новый отзыв ожидает модерации', `${author}: ${text.slice(0, 80)}`);
       await saveDb(db);
-      await sendTelegram(`⭐ Новый отзыв (${rating}/5) ожидает модерации в админ-панели\n${author}: ${text}`);
+      const message = `⭐ Новый отзыв (${rating}/5) ожидает модерации в админ-панели\n${author}: ${text}`;
+      await Promise.all([sendTelegram(message), sendWhatsApp(message)]);
       res.status(201).json({ success: true });
     })
   );
@@ -482,7 +523,13 @@ export function createApiApp() {
         pendingReviews: db.reviews.filter((r) => r.status === 'pending').length,
         last7Days,
         recentActivities: db.activities.slice(0, 50),
-        integrations: { telegram: telegramEnabled, gemini: geminiEnabled, geminiModel: GEMINI_MODEL, storage: storageMode },
+        integrations: {
+          telegram: telegramEnabled,
+          whatsapp: Boolean(await loadWhatsApp()),
+          gemini: geminiEnabled,
+          geminiModel: GEMINI_MODEL,
+          storage: storageMode,
+        },
       };
       res.json(stats);
     })
@@ -645,6 +692,55 @@ export function createApiApp() {
       const translated = response.text?.trim();
       if (!translated) throw new Error('Пустой ответ переводчика');
       res.json({ text: translated });
+    })
+  );
+
+  admin.get(
+    '/whatsapp',
+    handle(async (_req, res) => {
+      const wa = await loadWhatsApp();
+      res.set('Cache-Control', 'no-store');
+      res.json({ phone: wa?.phone || '', apiKeySet: Boolean(wa?.apiKey) });
+    })
+  );
+
+  // Saves the number and key; an empty key keeps the one saved before
+  admin.put(
+    '/whatsapp',
+    handle(async (req, res) => {
+      const phone = clean(req.body?.phone, 30).replace(/[^\d+]/g, '');
+      const digits = phone.replace(/\D/g, '');
+      if (digits.length < 9) {
+        res.status(400).json({ error: 'Укажите номер WhatsApp с кодом страны, например +996555123456' });
+        return;
+      }
+      const settings = (await readJson<{ whatsapp?: WhatsAppSettings }>(SETTINGS_PATH)) || {};
+      const apiKey = clean(req.body?.apiKey, 100) || settings.whatsapp?.apiKey || '';
+      if (!apiKey) {
+        res.status(400).json({ error: 'Укажите API-ключ, который прислал CallMeBot' });
+        return;
+      }
+      await writeJson(SETTINGS_PATH, { ...settings, whatsapp: { phone: `+${digits}`, apiKey } });
+      res.json({ phone: `+${digits}`, apiKeySet: true });
+    })
+  );
+
+  admin.delete(
+    '/whatsapp',
+    handle(async (_req, res) => {
+      const settings = (await readJson<{ whatsapp?: WhatsAppSettings }>(SETTINGS_PATH)) || {};
+      delete settings.whatsapp;
+      await writeJson(SETTINGS_PATH, settings);
+      res.json({ phone: '', apiKeySet: false });
+    })
+  );
+
+  admin.post(
+    '/whatsapp-test',
+    rateLimit('whatsapp-test', 10, 10 * 60 * 1000),
+    handle(async (_req, res) => {
+      const result = await sendWhatsApp('✅ Тестовое сообщение из админ-панели сайта-портфолио');
+      res.json({ result });
     })
   );
 
