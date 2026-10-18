@@ -40,10 +40,6 @@ export const HeroSection: React.FC<HeroSectionProps> = ({
           <div className="lg:col-span-7 space-y-6 text-left">
             {/* Location & Status Badges */}
             <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-semibold tracking-wide bg-emerald-800 text-emerald-50 rounded-full shadow-xs">
-                <Award className="w-3.5 h-3.5 text-amber-300" />
-                <span>{teacherProfile.honor[lang]}</span>
-              </span>
               <span className="inline-flex items-center gap-1.5 px-3 py-1 text-xs font-medium bg-amber-100 text-amber-900 border border-amber-300/80 rounded-full">
                 <MapPin className="w-3.5 h-3.5 text-amber-700" />
                 <span>{teacherProfile.city[lang]}</span>
