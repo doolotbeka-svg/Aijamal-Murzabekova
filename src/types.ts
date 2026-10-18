@@ -67,6 +67,8 @@ export interface ApplicationRecord {
   adminNote: string;
   notification: {
     telegram: 'sent' | 'failed' | 'disabled';
+    /** Missing on applications made before WhatsApp notifications existed */
+    whatsapp?: 'sent' | 'failed' | 'disabled';
     at: string;
   };
 }
@@ -89,5 +91,17 @@ export interface AdminStats {
   pendingReviews: number;
   last7Days: { date: string; visits: number }[];
   recentActivities: ActivityEvent[];
-  integrations: { telegram: boolean; gemini: boolean; geminiModel: string; storage: 'blob' | 'local' | 'missing' };
+  integrations: {
+    telegram: boolean;
+    whatsapp: boolean;
+    gemini: boolean;
+    geminiModel: string;
+    storage: 'blob' | 'local' | 'missing';
+  };
+}
+
+/** WhatsApp notification settings as the admin panel sees them (the API key is never sent back) */
+export interface WhatsAppSettingsView {
+  phone: string;
+  apiKeySet: boolean;
 }

@@ -1,5 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Language, ApplicationRecord, ApplicationStatus, AdminStats, Review, ReviewStatus } from '../types';
+import {
+  Language,
+  ApplicationRecord,
+  ApplicationStatus,
+  AdminStats,
+  Review,
+  ReviewStatus,
+  WhatsAppSettingsView,
+} from '../types';
 import { useContent } from '../ContentContext';
 import { ContentEditor } from './ContentEditor';
 import {
@@ -88,6 +96,11 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({ lang, 
   const [statusFilter, setStatusFilter] = useState<ApplicationStatus | 'all'>('all');
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [telegramTest, setTelegramTest] = useState('');
+  const [whatsapp, setWhatsapp] = useState<WhatsAppSettingsView | null>(null);
+  const [waPhone, setWaPhone] = useState('');
+  const [waKey, setWaKey] = useState('');
+  const [waStatus, setWaStatus] = useState('');
+  const [waBusy, setWaBusy] = useState(false);
 
   const saveToken = (value: string | null) => {
     setToken(value);
@@ -217,6 +230,65 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({ lang, 
       setReviews((prev) => prev.filter((r) => r.id !== review.id));
     } catch (e: any) {
       setLoadError(e.message);
+    }
+  };
+
+  // WhatsApp settings are loaded when the integrations tab is opened
+  useEffect(() => {
+    if (!token || activeTab !== 'settings') return;
+    api('/api/admin/whatsapp')
+      .then((data: WhatsAppSettingsView) => {
+        setWhatsapp(data);
+        setWaPhone(data.phone);
+      })
+      .catch((e) => setWaStatus(e.message));
+  }, [token, activeTab, api]);
+
+  const whatsappRequest = async (url: string, init: RequestInit, done: string) => {
+    setWaBusy(true);
+    setWaStatus('');
+    try {
+      const data: WhatsAppSettingsView = await api(url, init);
+      setWhatsapp(data);
+      setWaPhone(data.phone);
+      setWaKey('');
+      setWaStatus(done);
+      fetchDashboardData();
+    } catch (e: any) {
+      setWaStatus(e.message);
+    } finally {
+      setWaBusy(false);
+    }
+  };
+
+  const saveWhatsApp = () =>
+    whatsappRequest(
+      '/api/admin/whatsapp',
+      { method: 'PUT', body: JSON.stringify({ phone: waPhone, apiKey: waKey }) },
+      t('✓ Сохранено. Отправьте тестовое сообщение, чтобы проверить.', '✓ Сакталды. Текшерүү үчүн тест билдирүү жөнөтүңүз.')
+    );
+
+  const disableWhatsApp = () => {
+    if (!confirm(t('Отключить уведомления в WhatsApp?', 'WhatsApp билдирүүлөрүн өчүрөсүзбү?'))) return;
+    whatsappRequest('/api/admin/whatsapp', { method: 'DELETE' }, t('Уведомления в WhatsApp отключены', 'WhatsApp билдирүүлөрү өчүрүлдү'));
+  };
+
+  const runWhatsAppTest = async () => {
+    setWaBusy(true);
+    setWaStatus('…');
+    try {
+      const data = await api('/api/admin/whatsapp-test', { method: 'POST' });
+      setWaStatus(
+        data.result === 'sent'
+          ? t('✓ Сообщение отправлено — проверьте WhatsApp', '✓ Билдирүү жөнөтүлдү — WhatsAppты текшериңиз')
+          : data.result === 'disabled'
+          ? t('Сначала сохраните номер и API-ключ', 'Алгач номерди жана API-ачкычты сактаңыз')
+          : t('Ошибка отправки — проверьте номер и API-ключ', 'Жөнөтүү катасы — номерди жана ачкычты текшериңиз')
+      );
+    } catch (e: any) {
+      setWaStatus(e.message);
+    } finally {
+      setWaBusy(false);
     }
   };
 
@@ -465,20 +537,28 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({ lang, 
                     />
 
                     <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-xs">
-                      <div className="flex items-center gap-1.5 text-[11px] text-stone-500">
-                        {app.notification.telegram === 'sent' ? (
-                          <>
-                            <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
-                            <span>{t('Уведомление отправлено в Telegram', 'Telegramга жөнөтүлдү')}</span>
-                          </>
-                        ) : app.notification.telegram === 'failed' ? (
-                          <>
-                            <AlertCircle className="w-3.5 h-3.5 text-red-600" />
-                            <span>{t('Не удалось отправить в Telegram', 'Telegramга жөнөтүлгөн жок')}</span>
-                          </>
-                        ) : (
-                          <span>{t('Telegram-уведомления выключены', 'Telegram билдирүүлөрү өчүк')}</span>
-                        )}
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-stone-500">
+                        {(['telegram', 'whatsapp'] as const).map((channel) => {
+                          const name = channel === 'telegram' ? 'Telegram' : 'WhatsApp';
+                          const state = app.notification[channel] ?? 'disabled';
+                          return (
+                            <span key={channel} className="flex items-center gap-1.5">
+                              {state === 'sent' ? (
+                                <>
+                                  <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                                  {t(`Отправлено в ${name}`, `${name}га жөнөтүлдү`)}
+                                </>
+                              ) : state === 'failed' ? (
+                                <>
+                                  <AlertCircle className="w-3.5 h-3.5 text-red-600" />
+                                  {t(`Не удалось отправить в ${name}`, `${name}га жөнөтүлгөн жок`)}
+                                </>
+                              ) : (
+                                t(`${name}: уведомления выключены`, `${name}: билдирүүлөр өчүк`)
+                              )}
+                            </span>
+                          );
+                        })}
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2">
@@ -700,6 +780,105 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({ lang, 
 
         {activeTab === 'settings' && (
           <div className="space-y-4 text-xs">
+            <div className="bg-white p-5 rounded-xl border border-stone-200 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-stone-100">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center">
+                    <MessageCircle className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-stone-900 text-sm">{t('Уведомления в WhatsApp', 'WhatsApp билдирүүлөрү')}</h4>
+                    <p className="text-stone-500">{t('О новых заявках и отзывах', 'Жаңы билдирмелер жана пикирлер жөнүндө')}</p>
+                  </div>
+                </div>
+                <span
+                  className={`px-2 py-1 font-bold rounded text-[11px] ${
+                    whatsapp?.apiKeySet ? 'bg-emerald-100 text-emerald-800' : 'bg-stone-100 text-stone-600'
+                  }`}
+                >
+                  {whatsapp?.apiKeySet ? t('Подключено', 'Туташкан') : t('Не настроено', 'Жөндөлгөн эмес')}
+                </span>
+              </div>
+
+              <ol className="list-decimal pl-4 space-y-1 text-stone-600 leading-relaxed">
+                <li>
+                  {t('Откройте страницу сервиса CallMeBot: ', 'CallMeBot кызматынын баракчасын ачыңыз: ')}
+                  <a
+                    href="https://www.callmebot.com/blog/free-api-whatsapp-messages/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-semibold text-emerald-800 underline"
+                  >
+                    callmebot.com
+                  </a>
+                  {t(
+                    ' и сохраните в контакты телефона номер бота, указанный там.',
+                    ' жана андагы боттун номерин телефонуңуздагы байланыштарга сактаңыз.'
+                  )}
+                </li>
+                <li>
+                  {t('Отправьте этому номеру в WhatsApp сообщение: ', 'Ошол номерге WhatsApp аркылуу жазыңыз: ')}
+                  <code className="px-1 py-0.5 bg-stone-100 rounded">I allow callmebot to send me messages</code>
+                </li>
+                <li>
+                  {t(
+                    'В ответ придёт сообщение с API-ключом (apikey). Впишите ниже свой номер WhatsApp и этот ключ, нажмите «Сохранить», затем «Отправить тест».',
+                    'Жоопко API-ачкыч (apikey) келет. Төмөнгө WhatsApp номериңизди жана ачкычты жазып, «Сактоо», андан кийин «Тест жөнөтүү» басыңыз.'
+                  )}
+                </li>
+              </ol>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <label className="block">
+                  <span className="font-semibold text-stone-700">{t('Ваш номер WhatsApp', 'WhatsApp номериңиз')}</span>
+                  <input
+                    type="tel"
+                    value={waPhone}
+                    onChange={(e) => setWaPhone(e.target.value)}
+                    placeholder="+996555123456"
+                    className="mt-1 w-full px-3 py-2 text-sm bg-white border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-700"
+                  />
+                </label>
+                <label className="block">
+                  <span className="font-semibold text-stone-700">{t('API-ключ от CallMeBot', 'CallMeBot API-ачкычы')}</span>
+                  <input
+                    value={waKey}
+                    onChange={(e) => setWaKey(e.target.value)}
+                    placeholder={whatsapp?.apiKeySet ? t('сохранён — оставьте пустым', 'сакталган — бош калтырыңыз') : '123456'}
+                    autoComplete="off"
+                    className="mt-1 w-full px-3 py-2 text-sm bg-white border border-stone-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-700"
+                  />
+                </label>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={saveWhatsApp}
+                  disabled={waBusy || !waPhone.trim() || (!waKey.trim() && !whatsapp?.apiKeySet)}
+                  className="px-3 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg font-semibold disabled:opacity-50 cursor-pointer"
+                >
+                  {t('Сохранить', 'Сактоо')}
+                </button>
+                <button
+                  onClick={runWhatsAppTest}
+                  disabled={waBusy || !whatsapp?.apiKeySet}
+                  className="px-3 py-1.5 bg-white hover:bg-stone-100 text-stone-800 border border-stone-300 rounded-lg font-semibold disabled:opacity-50 cursor-pointer"
+                >
+                  {t('Отправить тест', 'Тест жөнөтүү')}
+                </button>
+                {whatsapp?.apiKeySet && (
+                  <button
+                    onClick={disableWhatsApp}
+                    disabled={waBusy}
+                    className="px-3 py-1.5 text-stone-500 hover:text-red-700 rounded-lg font-semibold disabled:opacity-50 cursor-pointer"
+                  >
+                    {t('Отключить', 'Өчүрүү')}
+                  </button>
+                )}
+                {waStatus && <span className="text-stone-600">{waStatus}</span>}
+              </div>
+            </div>
+
             <div className="bg-white p-5 rounded-xl border border-stone-200 space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-stone-100">
                 <div className="flex items-center gap-3">
