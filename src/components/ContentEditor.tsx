@@ -41,7 +41,8 @@ const BLOCK_TITLES: Partial<Record<Section, { ru: string; kg: string }>> = {
 };
 
 // Technical fields that are kept as-is but not shown in the editor
-const HIDDEN_KEYS = new Set(['id', 'icon', 'fileType', 'fileSize', 'downloadCount']);
+// ("honor" is no longer shown on the site but may remain in content saved earlier)
+const HIDDEN_KEYS = new Set(['id', 'icon', 'fileType', 'fileSize', 'downloadCount', 'honor']);
 const IMAGE_KEYS = new Set(['photoUrl', 'imageUrl']);
 
 const LABELS: Record<string, string> = {
@@ -49,7 +50,6 @@ const LABELS: Record<string, string> = {
   navName: 'Подпись в шапке сайта',
   shortName: 'Как обращаться (в текстах и чат-боте)',
   title: 'Название / должность',
-  honor: 'Почётное звание',
   city: 'Город',
   school: 'Школа',
   photoUrl: 'Фото учителя',
